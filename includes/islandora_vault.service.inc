@@ -19,7 +19,7 @@ function islandora_vault_service() {
    */
   //CREATE A LIST TASK
 /*
-  $name = 'list sandbox books3';
+  $name = 'list sandbox books9';
   $type = 'list';
   $data['setUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectSets/7';
   $data['storeUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
@@ -110,18 +110,16 @@ function islandora_vault_create_task($name, $data, $type = 'list', $state = 'Idl
       || empty($data['destStoreUri']) || empty($data['overwrite']) || empty($data['includeManaged']))) {
     throw new Exception('invalid data for copy task creation');
   }
-  if ($type == 'list') {
-    $data_string = '{"setUri":"' . $data['setUri'] . '","storeUri":"' . $data['storeUri'] . '"}';
-  }
-  else if ($type == 'copy') {
-    $data_string = '{"setUri":"' . $data['setUri'] . '","queryStoreUri":"' . $data['queryStoreUri'] . '","sourceStoreUrl":"' .
-        $data['sourceStoreUri'] . '","destStoreUri":"' . $data['destStoreUri'] . '","overwrite":"' . $data['overwrite'] .
-        '","includeManaged":"' . $data['includeManaged'] . '"}';
+  
+  $success = $data_string = json_encode($data);
+  if(!$success){
+    throw new Exception('Could not encode task data as json');    
   }
   $task['task']['name'] = $name;
   $task['task']['type'] = $type;
   $task['task']['state'] = $state;
   $task['task']['data'] = $data_string;
+  
   return $iv->createTask(json_encode($task));
 }
 
@@ -146,7 +144,11 @@ function islandora_vault_create_object_store($name, $data, $type = 'fedora') {
   if (empty($data) || empty($username) || empty($password) || empty($url)) {
     throw new Exception('invalid data for objectStore creation');
   }
-  $data_string = '{"url":"' . $url . '","username":"' . $username . '","password":"' . $password . '"}';
+  $success = $data_string = json_encode($data);
+  if(!$success){
+    throw new Exception('Could not encode store data as json');    
+  }
+  //$data_string = '{"url":"' . $url . '","username":"' . $username . '","password":"' . $password . '"}';
   $objectStore['objectStore']['name'] = $name;
   $objectStore['objectStore']['type'] = $type;
   $objectStore['objectStore']['data'] = $data_string;
@@ -174,7 +176,11 @@ function islandora_vault_create_set($name, $data, $type = 'query') {
   if (empty($queryType) || empty($queryText)) {
     throw new Exception('invalid data for objectSet creation');
   }
-  $data_string = '{"queryType":"' . $queryType . '","queryText":"' . $queryText . '"}';
+  $success = $data_string = json_encode($data);
+  if(!$success){
+    throw new Exception('Could not encode set data as json');    
+  }
+  //$data_string = '{"queryType":"' . $queryType . '","queryText":"' . $queryText . '"}';
   $objectSet['objectSet']['name'] = $name;
   $objectSet['objectSet']['type'] = $type;
   $objectSet['objectSet']['data'] = $data_string;
