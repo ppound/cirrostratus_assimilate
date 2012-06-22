@@ -1,11 +1,10 @@
 <?php
-
-
+define('ISLANDORA_VAULT_MANAGE_ITEMS', 'manage islandora vault items');
 /**
  * Implementation of hook_menu. 
  * we need some standard entry points so we can have consistent urls for different Object actions
  */
-function islandora_vault_menu(){
+function islandora_vault_menu() {
   $items = array();
   $items['admin/islandora/islandora_vault/configure'] = array(
     'title' => 'Islandora Vault Configuration',
@@ -20,12 +19,45 @@ function islandora_vault_menu(){
   $items['islandora_vault/service'] = array(
     'title' => 'Islandora Vault Serivce',
     //'description' => 'Configure settings for Islandora Duracloud cloudsync.',
-    'page callback' => 'islandora_vault_service',    
+    'page callback' => 'islandora_vault_service',
     'file' => 'includes/islandora_vault.service.inc',
     'access arguments' => array('administer site configuration'),
     'type' => MENU_CALLBACK,
     'weight' => -1,
   );
-  
+  $items['islandora/object/%islandora_object/manage/vault'] = array(
+    'title' => 'Vault',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('islandora_vault_manage_object_form', 2),
+    'type' => MENU_LOCAL_TASK,
+    'access callback' => 'islandora_vault_access',
+    'file' => 'includes/islandora_vault.forms.inc',
+    'access arguments' => array(2),
+  );
+
   return $items;
+}
+
+/**
+ * determines whether or not to show this modules manage tab
+ * @global object $user
+ * @param string $object_id
+ * @return boolean
+ */
+function islandora_vault_access($fedora_object) {
+  if (!isset($fedora_object)) {
+    return FALSE;
+  }
+  return user_access(FEDORA_MANAGE);
+}
+
+
+function islandora_vault_permission() {
+  return array(
+    ISLANDORA_VAULT_MANAGE_ITEMS => array(
+      'title' => t('Manage items in Islandora Vault'),
+      'description' => t('Allow users to add items to Duracloud')
+    )
+    );
+    
 }

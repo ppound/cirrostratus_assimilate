@@ -17,18 +17,22 @@ function islandora_vault_service() {
     $data['queryText'] = 'select $object from <#ri> where $object <fedora-model:hasModel> <info:fedora/islandora:bookCModel>';
     echo islandora_vault_create_set('list all books by cmodel',$data);
    */
+
+  //CREATE A PIDLIST SET
+  $data = "ilsandora:268\nislandora:269\nislandora:270";
+  echo islandora_vault_create_set('list all books by cmodel4', $data, 'pidList');
   //CREATE A LIST TASK
-/*
-  $name = 'list sandbox books9';
-  $type = 'list';
-  $data['setUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectSets/7';
-  $data['storeUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
-  $data['state'] = 'Idle';
-  echo islandora_vault_create_task($name, $data, $type);
-*/
+  /*
+    $name = 'list sandbox books9';
+    $type = 'list';
+    $data['setUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectSets/7';
+    $data['storeUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
+    $data['state'] = 'Idle';
+    echo islandora_vault_create_task($name, $data, $type);
+   */
 
   //CREATE A COPY TASK
-  
+  /*
     $name = 'copy sandbox books to Duracloud upei-dev';
     $type = 'copy';
     $data['setUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectSets/7';
@@ -39,10 +43,10 @@ function islandora_vault_service() {
     $data['overwrite'] = 'true';
     $data['includeManaged'] = 'true';
     echo islandora_vault_create_task($name,$data,$type);
-   
+   */
 
 //RUN A TASK
-   //echo islandora_vault_start_task('15');
+  //echo islandora_vault_start_task('29');
   //CREATE A STORE
   /*
     $data['username'] = 'fedoraAdmin';
@@ -56,7 +60,7 @@ function islandora_vault_service() {
 //echo $iv->listTaskLogs();
 //echo $iv->listTaskLogs();
 //echo $iv->deleteTaskLog('2');
-//echo $iv->getTasks();
+//echo $iv->listTasks();
 //echo $iv->getUsers;
   exit();
 }
@@ -67,6 +71,7 @@ function islandora_vault_service() {
  * @param string $task
  *   the task to start
  * @return type 
+ * @throws HttpConnectionExcption
  */
 function islandora_vault_start_task($task) {
   $iv = new IslandoraVault();
@@ -76,7 +81,7 @@ function islandora_vault_start_task($task) {
 
 /**
  * create a json string and send it the api
- * string should look like this
+ * string should look similar to this
  * {"task":{"name":"Copy islandora:268 from Fedora Repository at 
  * 192.168.56.195:8080 to DuraCloud Space upei-dev at dgi.duracloud.org (AMAZON_S3)",
  * "type":"copy","state":"Idle","data":"{\"setUri\":
@@ -110,16 +115,16 @@ function islandora_vault_create_task($name, $data, $type = 'list', $state = 'Idl
       || empty($data['destStoreUri']) || empty($data['overwrite']) || empty($data['includeManaged']))) {
     throw new Exception('invalid data for copy task creation');
   }
-  
-  $success = $data_string = json_encode($data);
-  if(!$success){
-    throw new Exception('Could not encode task data as json');    
+
+  $data_string = json_encode($data);
+  if (!$datastring) {
+    throw new Exception('Could not encode task data as json');
   }
   $task['task']['name'] = $name;
   $task['task']['type'] = $type;
   $task['task']['state'] = $state;
   $task['task']['data'] = $data_string;
-  
+
   return $iv->createTask(json_encode($task));
 }
 
@@ -144,9 +149,9 @@ function islandora_vault_create_object_store($name, $data, $type = 'fedora') {
   if (empty($data) || empty($username) || empty($password) || empty($url)) {
     throw new Exception('invalid data for objectStore creation');
   }
-  $success = $data_string = json_encode($data);
-  if(!$success){
-    throw new Exception('Could not encode store data as json');    
+  $data_string = json_encode($data);
+  if (!$datastring) {
+    throw new Exception('Could not encode store data as json');
   }
   //$data_string = '{"url":"' . $url . '","username":"' . $username . '","password":"' . $password . '"}';
   $objectStore['objectStore']['name'] = $name;
@@ -156,29 +161,36 @@ function islandora_vault_create_object_store($name, $data, $type = 'fedora') {
 }
 
 /**
- *
+ * Create a new set in cloudsync.  
  * @param string $name
  *  a name for the object set
  * @param string $type
- *  query, pidlist or pid pattern 
+ *  query, pidList or pid pattern 
  *  this function currently only supports query as a type
- * @param array $data
+ * @param mixed $data
  *  $data['queryType'] = 'iTQL'
  *  $data['queryText'] = 'select $object from <#ri>
   where $object <fedora-model:hasModel> <info:fedora/islandora:bookCModel>'
+ *  for pidLists $data should be a string consisting of a list of pids one per line
  * @return type
  * @throws Exception 
  */
 function islandora_vault_create_set($name, $data, $type = 'query') {
   $iv = new IslandoraVault();
-  $queryType = $data['queryType'];
-  $queryText = $data['queryText'];
-  if (empty($queryType) || empty($queryText)) {
-    throw new Exception('invalid data for objectSet creation');
+  if ($type == 'query' && (empty($data['queryType']) || empty($data['queryText']))) {
+    throw new Exception('invalid data for query objectSet creation');
   }
-  $success = $data_string = json_encode($data);
-  if(!$success){
-    throw new Exception('Could not encode set data as json');    
+  if (empty($data)) {
+    throw new Exception('invalid data for pidlist objectSet creation');
+  }
+  if (is_string($data)) {
+    $data_string = $data;
+  }
+  else {
+    $data_string = json_encode($data);
+  }
+  if (!$data_string) {
+    throw new Exception('Could not encode set data as json');
   }
   //$data_string = '{"queryType":"' . $queryType . '","queryText":"' . $queryText . '"}';
   $objectSet['objectSet']['name'] = $name;

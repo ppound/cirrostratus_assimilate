@@ -2,6 +2,7 @@
 name = Islandora Vault (Cirrostratus Assimilate)
 dependencies[] = islandora
 description = Link between Islandora and Fcrepo Cloudsync
+dependencies[] = islandora_basic_collection
 package = Islandora Tools
 version = 7.x-dev
 core = 7.x
