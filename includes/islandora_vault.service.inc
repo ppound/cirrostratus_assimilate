@@ -3,7 +3,7 @@
 //create an islsndoraVault api object 
 
 function islandora_vault_service() {
-  $iv = new IslandoraVault();
+  $iv = IslandoraVault::getInstance();
 //echo $iv->getServiceInfo(); 
 //echo $iv->listObjectSets();
 //echo $iv->getDuracloudAccounts();
@@ -19,8 +19,8 @@ function islandora_vault_service() {
    */
 
   //CREATE A PIDLIST SET
-  $data = "ilsandora:268\nislandora:269\nislandora:270";
-  echo islandora_vault_create_set('list all books by cmodel4', $data, 'pidList');
+ // $data = "ilsandora:268\nislandora:269\nislandora:270";
+  //echo islandora_vault_create_set('list all books by cmodel4', $data, 'pidList');
   //CREATE A LIST TASK
   /*
     $name = 'list sandbox books9';
@@ -74,7 +74,7 @@ function islandora_vault_service() {
  * @throws HttpConnectionExcption
  */
 function islandora_vault_start_task($task) {
-  $iv = new IslandoraVault();
+  $iv = IslandoraVault::getInstance();
   $data['task']['state'] = 'Starting';
   return $iv->updateTask($task, json_encode($data));
 }
@@ -106,9 +106,8 @@ function islandora_vault_start_task($task) {
  * @throws Exception 
  */
 function islandora_vault_create_task($name, $data, $type = 'list', $state = 'Idle') {
-  $iv = new IslandoraVault();
-
-  if (empty($data['setUri']) || (empty($data['storeUri']) && $type == 'list') || empty($state)) {
+  $iv = IslandoraVault::getInstance();
+  if ($type == 'list' && (empty($data['setUri']) || empty($data['storeUri']))) {
     throw new Exception('invalid data for list task creation');
   }
   if ($type == 'copy' && (empty($data['queryStoreUri']) || empty($data['sourceStoreUri'])
@@ -117,7 +116,7 @@ function islandora_vault_create_task($name, $data, $type = 'list', $state = 'Idl
   }
 
   $data_string = json_encode($data);
-  if (!$datastring) {
+  if (!$data_string) {
     throw new Exception('Could not encode task data as json');
   }
   $task['task']['name'] = $name;
@@ -142,7 +141,7 @@ function islandora_vault_create_task($name, $data, $type = 'list', $state = 'Idl
  * @throws Exception 
  */
 function islandora_vault_create_object_store($name, $data, $type = 'fedora') {
-  $iv = new IslandoraVault();
+  $iv = IslandoraVault::getInstance();
   $url = $data['url'];
   $username = $data['username'];
   $password = $data['password'];
@@ -176,7 +175,7 @@ function islandora_vault_create_object_store($name, $data, $type = 'fedora') {
  * @throws Exception 
  */
 function islandora_vault_create_set($name, $data, $type = 'query') {
-  $iv = new IslandoraVault();
+  $iv = IslandoraVault::getInstance();
   if ($type == 'query' && (empty($data['queryType']) || empty($data['queryText']))) {
     throw new Exception('invalid data for query objectSet creation');
   }
@@ -197,4 +196,31 @@ function islandora_vault_create_set($name, $data, $type = 'query') {
   $objectSet['objectSet']['type'] = $type;
   $objectSet['objectSet']['data'] = $data_string;
   return $iv->createObjectSet(json_encode($objectSet));
+}
+
+function islandora_vault_get_logs_by_task($task){
+  module_load_include('inc','islandora_vault', 'includes/islandora_vault.utils');
+  $iv = IslandoraVault::getInstance();
+  $taskLogs = $iv->listTaskLogs();
+  $json_array = json_decode($taskLogs, TRUE);
+  $associated_logs = array();
+  foreach($json_array['taskLogs'] as $log_entry){    
+    if(islandora_vault_identifier_from_uri($log_entry['taskUri']) == $task){
+      $associated_logs[] = $log_entry;
+    }
+  }
+  return $associated_logs;   
+}
+
+/**
+ *
+ * @param array $logs 
+ */
+function islandora_vault_delete_logs($logs){
+  module_load_include('inc','islandora_vault', 'includes/islandora_vault.utils');
+  $iv = IslandoraVault::getInstance();
+  foreach($logs as $log){
+    $log_number = islandora_vault_identifier_from_uri($log['uri']);
+    $iv->deleteTaskLog($log_number);
+  }
 }

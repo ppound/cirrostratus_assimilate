@@ -27,8 +27,8 @@ function islandora_vault_menu() {
   );
   $items['islandora/object/%islandora_object/manage/vault'] = array(
     'title' => 'Vault',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('islandora_vault_manage_object_form', 2),
+    'page callback' => 'islandora_vault_manage_object',
+    'page arguments' => array(2),
     'type' => MENU_LOCAL_TASK,
     'access callback' => 'islandora_vault_access',
     'file' => 'includes/islandora_vault.forms.inc',

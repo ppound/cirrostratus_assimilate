@@ -45,10 +45,17 @@ class VaultConnection extends RepositoryConnection {
 class IslandoraVault {
 
   protected $connection = NULL;
-
-  public function __construct() {
+  private static $_instance;
+  private function __construct() {
     $this->connection = new VaultConnection(variable_get('islandora_vault_cloudsync_url'), variable_get('islandora_vault_cloudsync_user'),
             variable_get('islandora_vault_cloudsync_password'));
+  }
+  
+  static public function getInstance(){
+    if(self::$_instance == NULL){
+      self::$_instance = new IslandoraVault();
+    }
+    return self::$_instance;
   }
 
   function getServiceInfo() {
@@ -139,7 +146,7 @@ class IslandoraVault {
 
   function getTask($task) {
     $task = '/' . $task;
-    $value = $this->connection->getRequest('taskLogs' . $task);
+    $value = $this->connection->getRequest('tasks' . $task);
     return $value['content'];
   }
 
