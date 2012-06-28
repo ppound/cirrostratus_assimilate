@@ -217,8 +217,7 @@ function islandora_vault_delete_cloudsync_task_form_submit($form, &$form_state) 
     $task = islandora_vault_identifier_from_uri($decode['backup']['task']['uri']);
     $associated_logs = islandora_vault_get_logs_by_task($task);
     islandora_vault_delete_logs($associated_logs);
-    $iv = IslandoraVault::getInstance();
-    $iv->deleteTask($task);
+    islandora_vault_delete_task_and_set($task);
   } catch (Exception $e) {
     drupal_set_message(t('Error Deleting backup task. %s', array('%s' => $e->getMessage())));
     return "";
