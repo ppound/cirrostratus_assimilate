@@ -139,6 +139,12 @@ class IslandoraVault {
   }
 
 //tasks
+  function deleteTask($task) {
+    $task = '/' . $task;
+    $value = $this->connection->deleteRequest('tasks' . $task);
+    return $value['content'];
+  }
+  
   function listTasks() {
     $value = $this->connection->getRequest('tasks');
     return $value['content'];

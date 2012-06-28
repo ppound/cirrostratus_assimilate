@@ -16,12 +16,14 @@ function islandora_vault_menu() {
     'type' => MENU_NORMAL_ITEM,
     'weight' => -1,
   );
-  $items['islandora_vault/service'] = array(
-    'title' => 'Islandora Vault Serivce',
+  $items['islandora_vault/%/manage/vault/logcontent'] = array(
+    'title' => 'Islandora Vault Serivce Log Content',
     //'description' => 'Configure settings for Islandora Duracloud cloudsync.',
-    'page callback' => 'islandora_vault_service',
+    'page callback' => 'islandora_vault_service_log_content',
     'file' => 'includes/islandora_vault.service.inc',
-    'access arguments' => array('administer site configuration'),
+    'page arguments' => array('islandora_vault_admin'),
+    'access arguments' => array('islandora_vault_access'),
+    'page arguments' => array(1),
     'type' => MENU_CALLBACK,
     'weight' => -1,
   );
@@ -50,6 +52,13 @@ function islandora_vault_access($fedora_object) {
   }
   return user_access(FEDORA_MANAGE);
 }
+
+/*function islandora_vault_admin_paths(){
+  $paths = array(
+    'islandora_vault/service/logcontent*' => TRUE,
+  );
+  return $paths;
+}*/
 
 
 function islandora_vault_permission() {

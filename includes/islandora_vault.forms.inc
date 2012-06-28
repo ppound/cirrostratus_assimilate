@@ -14,40 +14,44 @@
  * @return string
  */
 function islandora_vault_manage_object($object) {
-
-  //module_load_include('inc', 'islandora_basic_collection', 'includes/collection_manager_table');
-  module_load_include('inc', 'islandora_basic_collection', 'includes/collection_management');
   module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
   module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.api');
-  $duracloud_stores = islandora_vault_get_datastores_as_option_array();
-  $fedora_stores = islandora_vault_get_datastores_as_option_array('fedora');
-  //$table = islandora_collection_table($object);
-  //if (!$table) {
-  //  $form['no_objects'] = array(
-  //    '#type' => 'item',
-  //    '#title' => t('No objects found in this collection'),
-  //  );
-  //  return $form;
-  //}
+  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.service');
+  try {
+    $duracloud_stores = islandora_vault_get_datastores_as_option_array();
+    $fedora_stores = islandora_vault_get_datastores_as_option_array('fedora');
+  } catch (Exception $e) {
+    drupal_set_message(t('Could not load cloudsync datastores.  Please make sure cloudsync is running and you have
+      the Islandora Vault configured correctly'), 'error');
+    return "";
+  }
+
   if (isset($object['CLOUDSYNC'])) {
-    $json = $object->getDatastream('CLOUDSYNC');
+    $cloudsync_ds = $object->getDatastream('CLOUDSYNC');
   }
   $task_output = "";
   $cloudsync_json = NULL;
-  if (!empty($json)) {
-    $decode = json_decode($json->content, TRUE);
-    $task = islandora_vault_identifier_from_uri($decode['task']['uri']);
+  $backup_task = NULL;
+  $restore_task = NULL;
+  if (!empty($cloudsync_ds)) {
+    $decode = json_decode($cloudsync_ds->content, TRUE);
+    $backup_task_id = islandora_vault_identifier_from_uri($decode['backup']['task']['uri']);
+    $restore_task_id = islandora_vault_identifier_from_uri($decode['restore']['task']['uri']);
     module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.api');
     try {
       $iv = IslandoraVault::getInstance();
-      $cloudsync_json = $iv->getTask($task);
+      $backup_task = $iv->getTask($backup_task_id);
+      $restore_task = $iv->getTask($restore_task_id);
     } catch (Exception $e) {
       drupal_set_message(t('Error loading task, %s CLOUDSYNC datastream and cloudsync task maybe out of sync %t ', array('%s' => $object->id, '%t' => $e->getMessage())), 'error');
-      return $form;
+      return "";
     }
-    $task_output = islandora_vault_create_task_output($cloudsync_json);
+    $task_output = islandora_vault_create_task_output('Backup Task Data', $backup_task);
+    $task_output .= '<p>' . islandora_vault_create_task_output('Restore Task Data', $restore_task);
   }
-
+  $tasks = array();
+  $tasks['backup'] = json_decode($backup_task, TRUE);
+  $tasks['restore'] = json_decode($restore_task, TRUE);
   $form = array();
   $form['vault_manager'] = array(
     '#type' => 'vertical_tabs',
@@ -62,11 +66,11 @@ function islandora_vault_manage_object($object) {
     '#collapsed' => TRUE,
   );
 
-  $form['vault_manager']['run']['form'] = drupal_get_form('islandora_vault_run_cloudsync_task_form', $object, $task_output, $cloudsync_json);
+  $form['vault_manager']['run']['form'] = drupal_get_form('islandora_vault_run_cloudsync_task_form', $object, $task_output, $tasks);
 
 
   $form['vault_manager']['create'] = array(
-    '#title' => t('Create Cloudsync Task'),
+    '#title' => t('Create Cloudsync Tasks'),
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
@@ -76,14 +80,13 @@ function islandora_vault_manage_object($object) {
 
 
   $form['vault_manager']['delete'] = array(
-    '#title' => t('Delete Cloudsync Task'),
+    '#title' => t('Delete Cloudsync Tasks'),
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
 
-  $form['vault_manager']['delete']['form'] = drupal_get_form('islandora_vault_delete_cloudsync_task_form', $object, $task_output,
-      $cloudsync_json);
+  $form['vault_manager']['delete']['form'] = drupal_get_form('islandora_vault_delete_cloudsync_task_form', $object, $task_output, $tasks);
 
 
 
@@ -93,8 +96,8 @@ function islandora_vault_manage_object($object) {
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
-  
-  $form['vault_manager']['cloudsync_reports']['form'] = drupal_get_form('islandora_vault_cs_report_form', $object, $task_output);
+
+  $form['vault_manager']['cloudsync_reports']['form'] = drupal_get_form('islandora_vault_cs_report_form', $object, $task_output, $tasks);
 
 
   $form['vault_manager']['duracloud_reports'] = array(
@@ -108,7 +111,16 @@ function islandora_vault_manage_object($object) {
   return $form;
 }
 
-function islandora_vault_cs_report_form($form, &$form_state, $object, $task_output){
+/**
+ *
+ * @param type $form
+ * @param type $form_state
+ * @param type $object
+ * @param type $task_output
+ * @param type $cloudsync_json
+ * @return string 
+ */
+function islandora_vault_cs_report_form($form, &$form_state, $object, $task_output, $tasks) {
   if (isset($object['CLOUDSYNC'])) {
     $json = $object->getDatastream('CLOUDSYNC');
   }
@@ -120,13 +132,32 @@ function islandora_vault_cs_report_form($form, &$form_state, $object, $task_outp
     );
     return $form;
   }
+
+  $backup_task_id = islandora_vault_identifier_from_uri($tasks['backup']['task']['uri']);
+  $restore_task_id = islandora_vault_identifier_from_uri($tasks['restore']['task']['uri']);
+  $backup_array = islandora_vault_get_logs_by_task($backup_task_id);
+  $restore_array = islandora_vault_get_logs_by_task($restore_task_id);
+  $output = islandora_vault_print_logs('Backup Logs', $backup_array);
+  $output .= '<p>' . islandora_vault_print_logs('Restore Logs', $restore_array);
+  $form['run']['titlebox'] = array(
+    '#type' => 'item',
+    '#title' => t("Cloudsync Logs for @collection_pid", array('@collection_pid' => $object->id)),
+    '#description' => $output,
+  );
+  return $form;
 }
 
-function islandora_vault_delete_cloudsync_task_form($form, &$form_state, $object, $task_output, $cloudsync_json) {
-  if (isset($object['CLOUDSYNC'])) {
-    $json = $object->getDatastream('CLOUDSYNC');
-  }
-  else {
+/**
+ *
+ * @param type $form
+ * @param type $form_state
+ * @param type $object
+ * @param type $task_output
+ * @param type $cloudsync_json
+ * @return string 
+ */
+function islandora_vault_delete_cloudsync_task_form($form, &$form_state, $object, $task_output, $tasks) {
+  if (!isset($object['CLOUDSYNC'])) {
     $form['delete']['titlebox'] = array(
       '#type' => 'item',
       '#title' => t("Cloudsync Task not found for @collection_pid", array('@collection_pid' => $object->id)),
@@ -134,11 +165,11 @@ function islandora_vault_delete_cloudsync_task_form($form, &$form_state, $object
     );
     return $form;
   }
-  
+
   $form['delete']['titlebox'] = array(
     '#type' => 'item',
     '#title' => t("Cloudsync Task for @collection_pid", array('@collection_pid' => $object->id)),
-    '#description' => t("<strong>This will delete this task, the corresponding set and all logs associated with this task.</strong><br />"
+    '#description' => t("<strong>This will delete both the backup and restore tasks, the corresponding set and all logs associated with these tasks.</strong><br />"
         . $task_output),
   );
 
@@ -146,49 +177,84 @@ function islandora_vault_delete_cloudsync_task_form($form, &$form_state, $object
     '#type' => 'hidden',
     '#value' => $object->id,
   );
-  $decoded_cloudsync = json_decode($cloudsync_json, TRUE);
+
   $disabled = FALSE;
-  if ($decoded_cloudsync['task']['state'] == 'Starting') {
+  if ($tasks['backup']['task']['state'] != 'Idle' ||
+      $tasks['restore']['task']['state'] != 'Idle') {
     $disabled = TRUE;
   }
 
   $form['delete']['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Delete this task'),
-    '#suffix' => t('<br /><em>This will delete this task, the corresponding set and all cloudsync logs associated with this task.  This will not delete
+    '#value' => t('Delete tasks'),
+    '#suffix' => t('<br /><em>This will delete both the restore and backup tasks, the corresponding set and all cloudsync logs associated with these tasks.  This will not delete
       any fedora data or any items already copied to Duracloud</em>'),
     '#disabled' => $disabled,
   );
 
   return $form;
-  
 }
 
-function islandora_vault_delete_cloudsync_task_form_submit($form, &$form_state){
+/**
+ *
+ * @param type $form
+ * @param type $form_state
+ * @return type 
+ */
+function islandora_vault_delete_cloudsync_task_form_submit($form, &$form_state) {
   $object = islandora_object_load($form_state['values']['pid']);
   if (isset($object['CLOUDSYNC'])) {
     $json = $object->getDatastream('CLOUDSYNC');
   }
   else {
-    drupal_set_message(t('Error loading task for %s', array('%s' => $object->id)),'error');
+    drupal_set_message(t('Error loading task for %s', array('%s' => $object->id)), 'error');
     return $form;
   }
+
   $decode = json_decode($json->content, TRUE);
-  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.service');
-  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
-  $task = islandora_vault_identifier_from_uri($decode['task']['uri']);
-  $associated_logs = islandora_vault_get_logs_by_task($task);
-  islandora_vault_delete_logs($associated_logs);
-  
+
+  try {
+    $task = islandora_vault_identifier_from_uri($decode['backup']['task']['uri']);
+    $associated_logs = islandora_vault_get_logs_by_task($task);
+    islandora_vault_delete_logs($associated_logs);
+    $iv = IslandoraVault::getInstance();
+    $iv->deleteTask($task);
+  } catch (Exception $e) {
+    drupal_set_message(t('Error Deleting backup task. %s', array('%s' => $e->getMessage())));
+    return "";
+  }
+  drupal_set_message(t('Task and logs deleted for %s backup task', array('%s' => $object->id)));
+  try {
+    $task = islandora_vault_identifier_from_uri($decode['restore']['task']['uri']);
+    $associated_logs = islandora_vault_get_logs_by_task($task);
+    islandora_vault_delete_logs($associated_logs);
+    islandora_vault_delete_task_and_set($task);
+  } catch (Exception $e) {
+    drupal_set_message(t('Error Deleting task. %s', array('%s' => $e->getMessage())));
+    return "";
+  }
+  drupal_set_message(t('Task, set and logs deleted for %s restore task', array('%s' => $object->id)));
+  try {
+    $object->repository->api->m->purgeDatastream($object->id, 'CLOUDSYNC');
+  } catch (Exception $e) {
+    drupal_set_message(t('Error deleting CLOUDSYNC datastream deleted for %s', array('%s' => $object->id)), 'error');
+  }
+  drupal_set_message(t('CLOUDSYNC datastream deleted for %s', array('%s' => $object->id)));
 }
 
-function islandora_vault_run_cloudsync_task_form($form, &$form_state, $object, $task_output, $cloudsync_json) {
+/**
+ *
+ * @param type $form
+ * @param type $form_state
+ * @param type $object
+ * @param type $task_output
+ * @param type $cloudsync_json
+ * @return string 
+ */
+function islandora_vault_run_cloudsync_task_form($form, &$form_state, $object, $task_output, $tasks) {
   module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
   $form = array();
-  if (isset($object['CLOUDSYNC'])) {
-    $json = $object->getDatastream('CLOUDSYNC');
-  }
-  else {
+  if (!isset($object['CLOUDSYNC'])) {
     $form['run']['titlebox'] = array(
       '#type' => 'item',
       '#title' => t("Cloudsync Task not found for @collection_pid", array('@collection_pid' => $object->id)),
@@ -200,31 +266,59 @@ function islandora_vault_run_cloudsync_task_form($form, &$form_state, $object, $
   $form['run']['titlebox'] = array(
     '#type' => 'item',
     '#title' => t("Cloudsync Task for @collection_pid", array('@collection_pid' => $object->id)),
-    '#description' => t("<strong>This task will run in the background.  When this task is completed it's state will be reported as idle.</strong><br />"
-        . $task_output),
+    '#description' => t("<strong>This task will run in the background.  When this task is completed it's 
+      state will be reported as idle.</strong><br />"),
   );
 
   $form['run']['pid'] = array(
     '#type' => 'hidden',
     '#value' => $object->id,
   );
-  $decoded_cloudsync = json_decode($cloudsync_json, TRUE);
+
   $disabled = FALSE;
-  if ($decoded_cloudsync['task']['state'] == 'Starting') {
+  if ($tasks['backup']['task']['state'] != 'Idle' ||
+      $tasks['restore']['task']['state'] != 'Idle') {
     $disabled = TRUE;
   }
 
   $form['run']['submit'] = array(
+    '#prefix' => t('Current state is %s <p>', array('%s' => $tasks['backup']['task']['state'])),
     '#type' => 'submit',
-    '#value' => t('Run task'),
+    '#value' => t('Copy from Fedora to Duracloud'),
+    '#disabled' => $disabled,
+  );
+
+  $form['run']['advanced'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Advanced',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['run']['advanced']['titlebox'] = array(
+    '#type' => 'item',
+    '#title' => 'Run the restore task',
+    '#description' => 'This will copy items from Duracloud to Fedora,  Make sure you want to restore Fedora objects
+      before you run this task.  This task will run in the background.',
+  );
+  $form['run']['advanced']['restore_button'] = array(
+    '#prefix' => t('Current state is %s <p>', array('%s' => $tasks['restore']['task']['state'])),
+    '#type' => 'submit',
+    '#value' => t('Copy from Duracloud to Fedora'),
     '#disabled' => $disabled,
   );
 
   return $form;
 }
 
+/**
+ *
+ * @param type $form
+ * @param type $form_state
+ * @return type 
+ */
 function islandora_vault_run_cloudsync_task_form_submit($form, &$form_state) {
-  
+  //TODO compare uris in case some one has pointed us at a different cloudsync with
+  //existing tasks (we could run the wrong task)
   $object = islandora_object_load($form_state['values']['pid']);
   if (isset($object['CLOUDSYNC'])) {
     $json = $object->getDatastream('CLOUDSYNC');
@@ -234,10 +328,22 @@ function islandora_vault_run_cloudsync_task_form_submit($form, &$form_state) {
     return $form;
   }
   $decode = json_decode($json->content, TRUE);
-  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.service');
-  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
-  $task = islandora_vault_identifier_from_uri($decode['task']['uri']);
-  islandora_vault_start_task($task);
+  $task_type = 'Backup';
+  if ($form_state['values']['op'] == 'Copy from Duracloud to Fedora') {
+    $task_id = islandora_vault_identifier_from_uri($decode['restore']['task']['uri']);
+    $task_type = 'Restore';
+  }
+  else {
+    $task_id = islandora_vault_identifier_from_uri($decode['backup']['task']['uri']);
+  }
+  try {
+    islandora_vault_start_task($task_id);
+  } catch (Exception $e) {
+    drupal_set_message(t('Error running %t task. %s', array('%s' => $e->getMessage(), '%t' => $task_type)));
+  }
+  drupal_set_message(t('%s Task started.  Please check back later.  When the task is complete
+    the state will be reported as idle and you will be able to view the log in the Cloudsync Reports section.  
+    You will not be able to run this task again until it is completed.', array('%s' => $task_type)));
 }
 
 /**
@@ -253,7 +359,8 @@ function islandora_vault_create_cloudsync_task_form($form, &$form_state, $object
   $set_query = <<<EOD
 select \$object from <#ri>
 where (\$object <fedora-rels-ext:isMemberOfCollection> <info:fedora/$object->id>
-or \$object <fedora-rels-ext:isMemberOf> <info:fedora/$object->id>)            
+or \$object <fedora-rels-ext:isMemberOf> <info:fedora/$object->id>
+or \$object <mulgara:is> <info:fedora/$object->id>)            
 order by \$object
 EOD;
 
@@ -269,18 +376,19 @@ EOD;
   }
   $form['migrate']['titlebox'] = array(
     '#type' => 'item',
-    '#title' => t("Create a Cloudsync task for @collection_pid", array('@collection_pid' => $object->id)),
+    '#title' => t("Create a Cloudsync tasks for @collection_pid", array('@collection_pid' => $object->id)),
+    '#description' => t('This will create two tasks, one for copying objects to Duracloud and one for restoring objects from Duracloud')
   );
 
   $form['migrate']['toDatastore'] = array(
-    '#title' => t('Choose a Duracloud datastore (copy to)'),
+    '#title' => t('Choose a Duracloud datastore'),
     '#description' => t("All chosen content will be replicated to the selected datastore"),
     '#type' => 'select',
     '#options' => $duracloud_stores,
   );
 
   $form['migrate']['fromDatastore'] = array(
-    '#title' => t('Choose a Fedora datastore (copy from)'),
+    '#title' => t('Choose a Fedora datastore'),
     '#description' => t("All chosen content will be replicated to the selected datastore"),
     '#type' => 'select',
     '#options' => $fedora_stores,
@@ -315,7 +423,7 @@ EOD;
 
   $form['migrate']['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Create task'),
+    '#value' => t('Create tasks'),
   );
   return $form;
 }
@@ -327,10 +435,10 @@ EOD;
  * @param array $form_state 
  */
 function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) {
-  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.service');
+  //module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.service');
   //$pids = array_filter($form_state['values']['table']);
   $current = $form_state['values']['current'];
-  
+
   try {
     $object = islandora_object_load($current);
   } catch (Exception $e) {
@@ -338,7 +446,11 @@ function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) 
     return "";
   }
   $iv = IslandoraVault::getInstance();
-  $label = t('ISLANDORA MANAGED Set for object - !t - !p', array('!t' => $object->label, '!p' => $current));
+  $connection = Database::getConnection();
+  $options_array = $connection->getConnectionOptions();
+  $db = $options_array['database'];
+  $ip = getHostbyName(php_uname('n'));
+  $label = t('ISLANDORA MANAGED Set for object - !t - !d - !i', array('!t' => $object->id, '!d' => $db, '!i' => $ip));
   $data['queryType'] = $form_state['values']['query_type'];
   $data['queryText'] = $form_state['values']['set_query'];
   try {
@@ -349,7 +461,7 @@ function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) 
   }
   drupal_set_message(t('Created ') . $label);
   $set = json_decode($json, TRUE);
-  $label = t('ISLANDORA MANAGED Task for object - !t - !p', array('!t' => $object->label, '!p' => $current));
+  $backup_task_label = t('ISLANDORA MANAGED Task for object - !t - !d - !i - backup', array('!t' => $object->id, '!d' => $db, '!i' => $ip));
   //CREATE A COPY TASK
   $type = 'copy';
   $data['setUri'] = $set['objectSet']['uri'];
@@ -358,36 +470,51 @@ function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) 
   $data['destStoreUri'] = $form_state['values']['toDatastore'];
   $data['overwrite'] = 'true';
   $data['includeManaged'] = 'true';
+
   try {
-    $json = islandora_vault_create_task($label, $data, $type);
+    $backup_json = islandora_vault_create_task($backup_task_label, $data, $type);
   } catch (Exception $e) {
     drupal_set_message(t('error creating cloudsync task for %s %message', array('%s' => $current, '%message' => $e->getMessage())), 'error');
     return '';
   }
-  drupal_set_message(t('Created ') . $label);
+  drupal_set_message(t('Created ') . $backup_task_label);
+  $tasks = array();
+  $tasks['backup'] = json_decode($backup_json, TRUE);
+  //we need to create a pidlist set for restore duracloud can't do itql
+  //we execute the itql query to get the pidlist we will update this set before we run a restore
+  $results = $object->repository->ri->itqlQuery($form_state['values']['set_query'], 'unlimited', '0');
+  $pid_list = "";
+  foreach ($results as $result) {
+    $pid_list .= $result['object']['value'] . "\n";
+  }
+  $pid_list_label = t('ISLANDORA MANAGED PidList Set for object - !t - !d - !i', array('!t' => $object->id, '!d' => $db, '!i' => $ip));
   try {
-    $object->repository->api->m->addDatastream($current, 'CLOUDSYNC', 'string', $json, array('controlGroup' => 'M', 'dsLabel' => 'CLOUDSYNC'));
+    $pid_list_json = islandora_vault_create_set($pid_list_label, $pid_list, 'pidList');
+  } catch (Exception $e) {
+    drupal_set_message(t('error creating cloudsync pidlist set for %s %message', array('%s' => $current, '%message' => $e->getMessage())), 'error');
+    return '';
+  }
+  $pid_list_array = json_decode($pid_list_json, TRUE);
+  $data['setUri'] = $pid_list_array['objectSet']['uri'];
+  $data['queryStoreUri'] = $form_state['values']['toDatastore'];
+  $data['sourceStoreUri'] = $form_state['values']['fromDatastore'];
+  $data['destStoreUri'] = $form_state['values']['fromDatastore'];
+  $restore_task_label = t('ISLANDORA MANAGED Task for object - !t - !d - !i - restore', array('!t' => $object->id, '!d' => $db, '!i' => $ip));
+  try {
+    $restore_json = islandora_vault_create_task($restore_task_label, $data, $type);
+  } catch (Exception $e) {
+    drupal_set_message(t('error creating cloudsync task for %s %message', array('%s' => $current, '%message' => $e->getMessage())), 'error');
+    return '';
+  }
+  drupal_set_message(t('Created ') . $restore_task_label);
+  $tasks['restore'] = json_decode($restore_json, TRUE);
+  $ds_string = json_encode($tasks);
+  try {
+    $object->repository->api->m->addDatastream($current, 'CLOUDSYNC', 'string', $ds_string, array('controlGroup' => 'M', 'dsLabel' => 'CLOUDSYNC'));
   } catch (Exception $e) {
     drupal_set_message(t('error updating CLOUDSYNC datastream for %s %message', array('%s' => $current, '%message' => $e->getMessage())), 'error');
     return '';
   }
-  drupal_set_message(t('Added Cloudsync datastream to %s ', array('%s' => $current)));
+  drupal_set_message(t('Added CLOUDSYNC datastream to %s ', array('%s' => $current)));
 }
 
-/**
- * return a list of duracloud stores
- * @return type 
- */
-function islandora_vault_get_datastores_as_option_array($type = 'duracloud') {
-  module_load_include('inc', 'islandora_vault', '/includes/islandora_vault.api.inc');
-  $iv = IslandoraVault::getInstance();
-  $json = $iv->listObjectStores();
-  $stores = json_decode($json, TRUE);
-  $options = array();
-  foreach ($stores['objectStores'] as $store) {
-    if ($store['type'] == $type) {
-      $options[$store['uri']] = $store['name'];
-    }
-  }
-  return $options;
-}

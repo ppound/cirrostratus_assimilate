@@ -1,0 +1,59 @@
+  $iv = IslandoraVault::getInstance();
+//echo $iv->getServiceInfo(); 
+//echo $iv->listObjectSets();
+//echo $iv->getDuracloudAccounts();
+//echo $iv->getDuracloudSpaces();
+//echo $iv->getObjectSet('4');
+//echo $iv->listObjectStores();
+//echo $iv->getObjectStore('2');
+//CREATE A SET
+  /*
+    $data['queryType'] = 'iTQL';
+    $data['queryText'] = 'select $object from <#ri> where $object <fedora-model:hasModel> <info:fedora/islandora:bookCModel>';
+    echo islandora_vault_create_set('list all books by cmodel',$data);
+   */
+
+  //CREATE A PIDLIST SET
+ // $data = "ilsandora:268\nislandora:269\nislandora:270";
+  //echo islandora_vault_create_set('list all books by cmodel4', $data, 'pidList');
+  //CREATE A LIST TASK
+  /*
+    $name = 'list sandbox books9';
+    $type = 'list';
+    $data['setUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectSets/7';
+    $data['storeUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
+    $data['state'] = 'Idle';
+    echo islandora_vault_create_task($name, $data, $type);
+   */
+
+  //CREATE A COPY TASK
+  /*
+    $name = 'copy sandbox books to Duracloud upei-dev';
+    $type = 'copy';
+    $data['setUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectSets/7';
+    $data['queryStoreUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
+    $data['sourceStoreUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
+    $data['destStoreUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/3';
+
+    $data['overwrite'] = 'true';
+    $data['includeManaged'] = 'true';
+    echo islandora_vault_create_task($name,$data,$type);
+   */
+
+//RUN A TASK
+  //echo islandora_vault_start_task('29');
+  //CREATE A STORE
+  /*
+    $data['username'] = 'fedoraAdmin';
+    $data['password'] = 'islandora';
+    $data['url'] = 'http://sandbox.islandora.ca:8080/fedora';
+    $name = 'islandora Fedora sandbox';
+    $type = 'fedora';
+    echo islandora_vault_create_object_store($name, $data, $type = 'fedora');
+   */
+
+//echo $iv->listTaskLogs();
+//echo $iv->listTaskLogs();
+//echo $iv->deleteTaskLog('2');
+//echo $iv->listTasks();
+//echo $iv->getUsers;

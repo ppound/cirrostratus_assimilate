@@ -1,70 +1,5 @@
 <?php
 
-//create an islsndoraVault api object 
-
-function islandora_vault_service() {
-  $iv = IslandoraVault::getInstance();
-//echo $iv->getServiceInfo(); 
-//echo $iv->listObjectSets();
-//echo $iv->getDuracloudAccounts();
-//echo $iv->getDuracloudSpaces();
-//echo $iv->getObjectSet('4');
-//echo $iv->listObjectStores();
-//echo $iv->getObjectStore('2');
-//CREATE A SET
-  /*
-    $data['queryType'] = 'iTQL';
-    $data['queryText'] = 'select $object from <#ri> where $object <fedora-model:hasModel> <info:fedora/islandora:bookCModel>';
-    echo islandora_vault_create_set('list all books by cmodel',$data);
-   */
-
-  //CREATE A PIDLIST SET
- // $data = "ilsandora:268\nislandora:269\nislandora:270";
-  //echo islandora_vault_create_set('list all books by cmodel4', $data, 'pidList');
-  //CREATE A LIST TASK
-  /*
-    $name = 'list sandbox books9';
-    $type = 'list';
-    $data['setUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectSets/7';
-    $data['storeUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
-    $data['state'] = 'Idle';
-    echo islandora_vault_create_task($name, $data, $type);
-   */
-
-  //CREATE A COPY TASK
-  /*
-    $name = 'copy sandbox books to Duracloud upei-dev';
-    $type = 'copy';
-    $data['setUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectSets/7';
-    $data['queryStoreUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
-    $data['sourceStoreUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/17';
-    $data['destStoreUri'] = 'http://localhost:8080/fedoracloudsync/api/rest/objectStores/3';
-
-    $data['overwrite'] = 'true';
-    $data['includeManaged'] = 'true';
-    echo islandora_vault_create_task($name,$data,$type);
-   */
-
-//RUN A TASK
-  //echo islandora_vault_start_task('29');
-  //CREATE A STORE
-  /*
-    $data['username'] = 'fedoraAdmin';
-    $data['password'] = 'islandora';
-    $data['url'] = 'http://sandbox.islandora.ca:8080/fedora';
-    $name = 'islandora Fedora sandbox';
-    $type = 'fedora';
-    echo islandora_vault_create_object_store($name, $data, $type = 'fedora');
-   */
-
-//echo $iv->listTaskLogs();
-//echo $iv->listTaskLogs();
-//echo $iv->deleteTaskLog('2');
-//echo $iv->listTasks();
-//echo $iv->getUsers;
-  exit();
-}
-
 /**
  * Sends a patch request to change state to Starting
  * which invokes the task
@@ -198,29 +133,116 @@ function islandora_vault_create_set($name, $data, $type = 'query') {
   return $iv->createObjectSet(json_encode($objectSet));
 }
 
-function islandora_vault_get_logs_by_task($task){
-  module_load_include('inc','islandora_vault', 'includes/islandora_vault.utils');
+/**
+ * returns the contents of a log
+ * @param string $log
+ *   log number
+ * @return string 
+ *   content of the log
+ */
+function islandora_vault_service_log_content($log) {
+  $iv = IslandoraVault::getInstance();
+  try {
+    $content = $iv->getTaskLog($log);
+  } catch (Exception $e) {
+    return 'Error loading log content';
+  }
+  return '<pre>' . $content . '</pre>';
+}
+
+/**
+ * gets all log entries associated with a task
+ * @param string $task
+ * @return array
+ */
+function islandora_vault_get_logs_by_task($task) {
+  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
   $iv = IslandoraVault::getInstance();
   $taskLogs = $iv->listTaskLogs();
   $json_array = json_decode($taskLogs, TRUE);
   $associated_logs = array();
-  foreach($json_array['taskLogs'] as $log_entry){    
-    if(islandora_vault_identifier_from_uri($log_entry['taskUri']) == $task){
+  foreach ($json_array['taskLogs'] as $log_entry) {
+    if (islandora_vault_identifier_from_uri($log_entry['taskUri']) == $task) {
       $associated_logs[] = $log_entry;
     }
   }
-  return $associated_logs;   
+  return $associated_logs;
 }
 
 /**
- *
- * @param array $logs 
+ * deletes a task and its associated set.
+ * @param string $task 
  */
-function islandora_vault_delete_logs($logs){
-  module_load_include('inc','islandora_vault', 'includes/islandora_vault.utils');
+function islandora_vault_delete_task_and_set($task) {
+  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
   $iv = IslandoraVault::getInstance();
-  foreach($logs as $log){
+  $json_task = $iv->getTask($task);
+  $json_array = json_decode($json_task, TRUE);
+  $data = $json_array['task']['data'];
+  $data_array = json_decode($data, TRUE); //data is nested as a string in the original array
+  $setUri = $data_array['setUri']; //we need to get the setUri from the task before we can delete it
+  $set = islandora_vault_identifier_from_uri($setUri);
+  $iv->deleteTask($task);
+  $iv->deleteObjectSet($set);
+}
+
+/**
+ * deletes everything related to a task
+ * all logs, the task and associated set
+ * @param string $task 
+ */
+function islandora_vault_delete_all($task) {
+  $associated_logs = islandora_vault_get_logs_by_task($task);
+  islandora_vault_delete_logs($associated_logs);
+  islandora_vault_delete_task_and_set($task);
+}
+
+function islandora_vault_create_restore_task($query){
+  $iv = IslandoraVault::getInstance();
+  $connection = Database::getConnection();
+  $options_array = $connection->getConnectionOptions();
+  $db = $options_array['database'];
+  $ip = getHostbyName(php_uname('n'));
+  $label = t('ISLANDORA MANAGED Set for object - !t - !d - !i', array('!t' => $object->id, '!d' => $db, '!i' => $ip));
+  $data['queryType'] = $form_state['values']['query_type'];
+  $data['queryText'] = $form_state['values']['set_query'];
+  try {
+    $json = islandora_vault_create_set($label, $data, 'query');
+  } catch (Exception $e) {
+    drupal_set_message(t('error creating cloudsync list for %s %message', array('%s' => $current, '%message' => $e->getMessage())), 'error');
+    return '';
+  }
+}
+
+/**
+ * deletes log entries
+ * @param array $logs 
+ *   json decode array
+ */
+function islandora_vault_delete_logs($logs) {
+  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
+  $iv = IslandoraVault::getInstance();
+  foreach ($logs as $log) {
     $log_number = islandora_vault_identifier_from_uri($log['uri']);
     $iv->deleteTaskLog($log_number);
   }
 }
+
+/**
+ * return a list of duracloud stores
+ * @return type 
+ */
+function islandora_vault_get_datastores_as_option_array($type = 'duracloud') {
+  module_load_include('inc', 'islandora_vault', '/includes/islandora_vault.api.inc');
+  $iv = IslandoraVault::getInstance();
+  $json = $iv->listObjectStores();
+  $stores = json_decode($json, TRUE);
+  $options = array();
+  foreach ($stores['objectStores'] as $store) {
+    if ($store['type'] == $type) {
+      $options[$store['uri']] = $store['name'];
+    }
+  }
+  return $options;
+}
+
