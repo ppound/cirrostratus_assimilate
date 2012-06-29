@@ -496,7 +496,7 @@ function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) 
   $pid_list_array = json_decode($pid_list_json, TRUE);
   $data['setUri'] = $pid_list_array['objectSet']['uri'];
   $data['queryStoreUri'] = $form_state['values']['toDatastore'];
-  $data['sourceStoreUri'] = $form_state['values']['fromDatastore'];
+  $data['sourceStoreUri'] = $form_state['values']['toDatastore'];
   $data['destStoreUri'] = $form_state['values']['fromDatastore'];
   $restore_task_label = t('ISLANDORA MANAGED Task for object - !t - !d - !i - restore', array('!t' => $object->id, '!d' => $db, '!i' => $ip));
   try {
