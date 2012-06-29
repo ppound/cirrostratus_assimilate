@@ -434,8 +434,6 @@ EOD;
  * @param array $form_state 
  */
 function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) {
-  //module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.service');
-  //$pids = array_filter($form_state['values']['table']);
   $current = $form_state['values']['current'];
 
   try {
@@ -467,7 +465,7 @@ function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) 
   $data['queryStoreUri'] = $form_state['values']['fromDatastore'];
   $data['sourceStoreUri'] = $form_state['values']['fromDatastore'];
   $data['destStoreUri'] = $form_state['values']['toDatastore'];
-  $data['overwrite'] = 'true';
+  $data['overwrite'] = 'false';
   $data['includeManaged'] = 'true';
 
   try {

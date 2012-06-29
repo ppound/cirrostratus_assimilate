@@ -70,3 +70,9 @@ function islandora_vault_permission() {
     );
     
 }
+
+function islandora_vault_islandora_pre_purge_object($object){
+  if(isset($object['CLOUDSYNC'])){
+    //TODO: delete cloudsync tasks etc.
+  }
+}
