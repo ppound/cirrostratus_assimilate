@@ -40,10 +40,18 @@ function islandora_vault_admin($form, &$form_state) {
   $form['islandora_vault_cloudsync_password'] = array(
     '#type' => 'password_confirm',
     '#title' => t('Cloudsync password'),
+    //'#default_value' => variable_get('islandora_vault_cloudsync_password', 'password'),
     '#required' => TRUE,
   );
- 
   
-  
+  $form ['islandora_vault_duracloud_store'] = array(
+    '#type' => 'textfield',
+    '#maxlength' => '255',
+    '#size' => '80',
+    '#title' => t('Duracloud store url'),
+    '#description' => t('The url for the duracloud store.  This url will be provided by your cloudsync administrator.'),
+    '#default_value' => variable_get('islandora_vault_duracloud_store','http://localhost:8080/cloudsync/api/rest/objectStores/id'),    
+  );
+ //TODO: don't use system settings form so we can encrypt passwords (we need more control over loading and saving the passwords
   return system_settings_form($form);
 }

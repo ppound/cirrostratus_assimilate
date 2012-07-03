@@ -107,19 +107,11 @@ function islandora_vault_manage_object($object) {
     '#collapsed' => TRUE,
   );
 
+  $form['vault_manager']['duracloud_reports']['form'] = drupal_get_form('islandora_vault_dc_report_form', $object, $task_output, $tasks);
 
   return $form;
 }
 
-/**
- *
- * @param type $form
- * @param type $form_state
- * @param type $object
- * @param type $task_output
- * @param type $cloudsync_json
- * @return string 
- */
 function islandora_vault_cs_report_form($form, &$form_state, $object, $task_output, $tasks) {
   if (isset($object['CLOUDSYNC'])) {
     $json = $object->getDatastream('CLOUDSYNC');
@@ -142,6 +134,33 @@ function islandora_vault_cs_report_form($form, &$form_state, $object, $task_outp
   $form['run']['titlebox'] = array(
     '#type' => 'item',
     '#title' => t("Cloudsync Logs for @collection_pid", array('@collection_pid' => $object->id)),
+    '#description' => $output,
+  );
+  return $form;
+}
+
+
+/**
+ *
+ * @param type $form
+ * @param type $form_state
+ * @param type $object
+ * @param type $task_output
+ * @param type $cloudsync_json
+ * @return string 
+ */
+function islandora_vault_dc_report_form($form, &$form_state, $object, $task_output, $tasks) {
+  $dc = DuracloudVault::getInstance();
+  try{
+    $output = $dc->getItemProperties($object->id);
+  }catch(Exception $e){
+    $output = 'Item does not exist in duracloud';
+  }
+  //get list of datastreams
+  //$object->
+  $form['run']['titlebox'] = array(
+    '#type' => 'item',
+    '#title' => t("Duracloud info for @collection_pid", array('@collection_pid' => $object->id)),
     '#description' => $output,
   );
   return $form;
@@ -328,6 +347,17 @@ function islandora_vault_run_cloudsync_task_form_submit($form, &$form_state) {
   }
   $decode = json_decode($json->content, TRUE);
   $task_type = 'Backup';
+  //update the restore tasks set pidlist
+  try {
+    $set_data = islandora_vault_get_set_by_task($decode['backup']['task'], TRUE);
+    $pid_list = islandora_vault_get_pid_list($object, $set_data['queryText'], $set_data['queryType']);
+    $set = islandora_vault_get_set_by_task($decode['restore']['task']);
+    $set_id = islandora_vault_identifier_from_uri($set['objectSet']['uri']);
+    islandora_vault_update_set($set_id, $pid_list);
+  } catch (Exception $e) {
+    drupal_set_message(t('Error updating task pidList for %p %s', array('%s' => $e->getMessage(), '%p' => $object->id)), 'error');
+    return "";
+  }
   if ($form_state['values']['op'] == 'Copy from Duracloud to Fedora') {
     $task_id = islandora_vault_identifier_from_uri($decode['restore']['task']['uri']);
     $task_type = 'Restore';
@@ -378,12 +408,24 @@ EOD;
     '#title' => t("Create a Cloudsync tasks for @collection_pid", array('@collection_pid' => $object->id)),
     '#description' => t('This will create two tasks, one for copying objects to Duracloud and one for restoring objects from Duracloud')
   );
-
+  $durastore_uri = variable_get('islandora_vault_duracloud_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id');
+  $durastore_id = islandora_vault_identifier_from_uri($durastore_uri);
+  $iv = IslandoraVault::getInstance();
+  try {
+    $durastore = $iv->getObjectStore($durastore_id);
+  } catch (Exception $e) {
+    drupal_set_message(t('Could not load durastore information'));
+    return "";
+  }
+  $durastore = json_decode($durastore, TRUE);
   $form['migrate']['toDatastore'] = array(
-    '#title' => t('Choose a Duracloud datastore'),
-    '#description' => t("All chosen content will be replicated to the selected datastore"),
-    '#type' => 'select',
-    '#options' => $duracloud_stores,
+    '#title' => t('Duracloud datastore'),
+    '#description' => t("All chosen content will be replicated to the datastore %s", array('%s' => $durastore['objectStore']['name'])),
+    '#type' => 'textfield',
+    '#size' => 85,
+    '#maxlength' => 255,
+    '#disabled' => TRUE,
+    '#value' => $durastore['objectStore']['uri'],
   );
 
   $form['migrate']['fromDatastore'] = array(
@@ -465,7 +507,7 @@ function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) 
   $data['queryStoreUri'] = $form_state['values']['fromDatastore'];
   $data['sourceStoreUri'] = $form_state['values']['fromDatastore'];
   $data['destStoreUri'] = $form_state['values']['toDatastore'];
-  $data['overwrite'] = 'false';
+  $data['overwrite'] = 'true';
   $data['includeManaged'] = 'true';
 
   try {
@@ -477,13 +519,7 @@ function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) 
   drupal_set_message(t('Created ') . $backup_task_label);
   $tasks = array();
   $tasks['backup'] = json_decode($backup_json, TRUE);
-  //we need to create a pidlist set for restore duracloud can't do itql
-  //we execute the itql query to get the pidlist we will update this set before we run a restore
-  $results = $object->repository->ri->itqlQuery($form_state['values']['set_query'], 'unlimited', '0');
-  $pid_list = "";
-  foreach ($results as $result) {
-    $pid_list .= $result['object']['value'] . "\n";
-  }
+  $pid_list = islandora_vault_get_pid_list($object, $data['queryText'], strtolower($data['queryType']));
   $pid_list_label = t('ISLANDORA MANAGED PidList Set for object - !t - !d - !i', array('!t' => $object->id, '!d' => $db, '!i' => $ip));
   try {
     $pid_list_json = islandora_vault_create_set($pid_list_label, $pid_list, 'pidList');

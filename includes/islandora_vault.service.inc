@@ -15,6 +15,17 @@ function islandora_vault_start_task($task) {
 }
 
 /**
+ *
+ * @param string $set_id
+ * @param string/array $data
+ * @return string
+ */
+function islandora_vault_update_set($set_id, $data){
+  $iv = IslandoraVault::getInstance();
+  return $iv->updateObjectSet($set_id, $data);
+}
+
+/**
  * create a json string and send it the api
  * string should look similar to this
  * {"task":{"name":"Copy islandora:268 from Fedora Repository at 
@@ -212,6 +223,31 @@ function islandora_vault_create_restore_task($query){
     drupal_set_message(t('error creating cloudsync list for %s %message', array('%s' => $current, '%message' => $e->getMessage())), 'error');
     return '';
   }
+}
+
+/**
+ *
+ * @param array $task
+ * @param boolean $data_only
+ * @return array
+ *   an array containing either the whole set or just the data portion
+ *   
+ */
+function islandora_vault_get_set_by_task($task, $data_only = FALSE){
+  $data_string = $task['data'];
+  $data_array = json_decode($data_string, TRUE);
+  $set_uri = $data_array['setUri'];
+  $set_id = islandora_vault_identifier_from_uri($set_uri);
+  $iv = $iv = IslandoraVault::getInstance();
+  $set = $iv->getObjectSet($set_id);
+  $set_array = json_decode($set, TRUE);
+  if(!$data_only){
+    return $set_array;
+  }
+  $data = $set_array['objectSet']['data'];
+  return json_decode($data, TRUE);
+  
+  
 }
 
 /**

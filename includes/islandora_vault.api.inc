@@ -46,13 +46,14 @@ class IslandoraVault {
 
   protected $connection = NULL;
   private static $_instance;
+
   private function __construct() {
     $this->connection = new VaultConnection(variable_get('islandora_vault_cloudsync_url'), variable_get('islandora_vault_cloudsync_user'),
             variable_get('islandora_vault_cloudsync_password'));
   }
-  
-  static public function getInstance(){
-    if(self::$_instance == NULL){
+
+  static public function getInstance() {
+    if (self::$_instance == NULL) {
       self::$_instance = new IslandoraVault();
     }
     return self::$_instance;
@@ -64,6 +65,13 @@ class IslandoraVault {
   }
 
 //sets
+  function updateObjectSet($set, $data) {
+    return 'not implemented in cloudsync yet';
+    $set = '/' . $set;
+    $value = $this->connection->postRequest('objectSets' . $set, 'string', $data, OBJECTSET_JSON);
+    return $value['content'];
+  }
+
   function getObjectSet($set) {
     $set = '/' . $set;
     $value = $this->connection->getRequest('objectSets' . $set);
@@ -144,7 +152,7 @@ class IslandoraVault {
     $value = $this->connection->deleteRequest('tasks' . $task);
     return $value['content'];
   }
-  
+
   function listTasks() {
     $value = $this->connection->getRequest('tasks');
     return $value['content'];
@@ -160,8 +168,8 @@ class IslandoraVault {
     $value = $this->connection->postRequest('tasks', 'string', $data, TASK_JSON);
     return $value['content'];
   }
-  
-  function updateTask($task, $data){
+
+  function updateTask($task, $data) {
     $task = '/' . $task;
     $value = $this->connection->patchRequest('tasks' . $task, 'string', $data, TASK_JSON);
     return $value['content'];
@@ -170,6 +178,52 @@ class IslandoraVault {
 //users
   function getUsers() {
     $value = $this->connection->getRequest('users.json');
+    return $value['content'];
+  }
+
+}
+
+class DuracloudVault {
+
+  protected $connection = NULL;
+  private static $_instance;
+
+  private function __construct() {
+    $duracloud_uri = variable_get('islandora_vault_duracloud_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id');
+    $duracloud_id = islandora_vault_identifier_from_uri($duracloud_uri);
+    $iv = IslandoraVault::getInstance();
+    $duracloud = $iv->getObjectStore($duracloud_id);
+    $duracloud = json_decode($duracloud, TRUE);
+    $data = json_decode($duracloud['objectStore']['data'], TRUE);
+    $this->connection = new VaultConnection($data['url'] . '/' . $data['space'], $data['username'], $data['password']);
+  }
+
+  static public function getInstance() {
+    if (self::$_instance == NULL) {
+      self::$_instance = new DuracloudVault();
+    }
+    return self::$_instance;
+  }
+
+  /**
+   * gets the request headers of an item in duracloud if it exists.
+   * @param string $id
+   * @return array
+   */
+  function getItemProperties($id) {
+    $id = '/' . $id;
+    $value = $this->connection->getRequest($id, TRUE);
+    return $value['headers'];
+  }
+
+  /**
+   * gets the content of an item in duracloud
+   * @param string $id
+   * @return type 
+   */
+  function getItemContent($id) {
+    $id .= '/?attachment=TRUE';
+    $value = $this->connection->getRequest($id);
     return $value['content'];
   }
 
