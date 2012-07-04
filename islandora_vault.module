@@ -72,7 +72,7 @@ function islandora_vault_permission() {
 }
 
 /**
- * preprocess the edit template
+ * preprocess the edit template add the vault column
  * @global string $base_url
  * @param array $variables
  *   theme variables for the edit template
@@ -81,49 +81,43 @@ function islandora_vault_preprocess_islandora_default_edit(&$variables) {
   $islandora_object = $variables['islandora_object'];
   module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
   global $base_url;
-  $datastreams = array();
-  //$variables['islandora_editmetadata_url'] = $base_url . '/islandora/edit_form/' . $islandora_object->id;
+
   module_load_include('inc', 'islandora', 'includes/datastream');
   module_load_include('inc', 'islandora', 'includes/utilities');
-  // $variables['add_datastream_form'] = drupal_get_form('islandora_add_datastream_form', $islandora_object->id);
-  $header = array(
-    array('data' => t('Vault')),
-    array('data' => t('ID')),
-    array('data' => t('Label')),
-    array('data' => t('Type')),
-    array('data' => t('Mime type')),
-    array('data' => t('Size')),
-    array('data' => t('Operations'), 'colspan' => '3'),
-      //array('data' => t('Delete')),
-  );
-  $table_attributes = array('class' => array('manage-datastreams'));
-  $rows = array();
-  foreach ($islandora_object as $ds) {
-    $duracloud_info = "";
-    if ($ds->controlGroup == 'M') {
-      try {
-        $headers = islandora_vault_get_duracloud_item_properties($ds->location);
-        $duracloud_info = $headers['Content-Md5'];
-      } catch (Exception $e) {
-        $duracloud_info = 'Missing';
+
+  $table = &$variables['datastream_table'];
+
+  $rows = &$table['rows'];
+  $i = -1;
+  foreach ($rows as &$row) {
+    ++$i;
+    $dc_checksum = '';
+    foreach ($row as &$column) {
+      foreach ($islandora_object as $ds) {
+        if ($column['class'] == 'datastream-label' && $column['data'] == $ds->label) {
+          $rt_value = "";
+          if ($ds->controlGroup == 'M') {
+            try {
+              $variable = $ds->location;
+              $headers = islandora_vault_get_duracloud_item_properties($ds->location);
+              $rt_value = ($dc_checksum == $headers['Content-Md5']) ? 'Match' : 'Mismatch';
+            } catch (Exception $e) {
+              $rt_value = 'Missing';
+            }
+          }
+        }
       }
     }
-
-    $rows[] = array(
-      array('class' => 'vault-datastream', 'data' => $duracloud_info),
-      array('class' => 'datastream-id', 'data' => l($ds->id, islandora_datastream_get_url($ds, 'view'))),
-      array('class' => 'datastream-label', 'data' => $ds->label),
-      array('class' => 'datastream-control', 'data' => islandora_control_group_to_human_readable($ds->controlGroup)),
-      array('class' => 'datastream-mime', 'data' => $ds->mimeType),
-      array('class' => 'datastream-size', 'data' => islandora_datastream_get_human_readable_size($ds)),
-      array('class' => 'datastream-download', 'data' => l(t('download'), islandora_datastream_get_url($ds, 'download'))),
-      array('class' => 'datstream-edit', 'data' => islandora_datastream_edit_get_link($islandora_object, $ds->id)),
-      array('class' => 'datastream-delete', 'data' => islandora_datastream_get_delete_link($ds)),
-    );
+    $vault_row = array('class' => 'vault-datastream', 'data' => $rt_value);
+    array_unshift($row, $vault_row);
   }
-  $caption = $islandora_object->label . ' - ' . $islandora_object->id;
-  $table = array('colgroups' => NULL, 'sticky' => TRUE, 'empty' => 'Error loading datastreams', 'caption' => $caption, 'header' => $header, 'rows' => $rows, 'attributes' => $table_attributes);
-  $variables['datastream_table'] = theme_table($table);
+
+  $headers = &$table['header'];
+  $vault_header = array('data' => t('Vault'));
+  array_unshift($headers, $vault_header);
+
+  //$table = array('colgroups' => NULL, 'sticky' => TRUE, 'empty' => 'Error loading datastreams', 'caption' => $caption, 'header' => $header, 'rows' => $rows, 'attributes' => $table_attributes);
+  //$variables['datastream_table'] = $table;
 }
 
 /*
