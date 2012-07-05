@@ -90,17 +90,14 @@ function islandora_vault_preprocess_islandora_default_edit(&$variables) {
   $rows = &$table['rows'];
   $i = -1;
   foreach ($rows as &$row) {
-    ++$i;
-    $dc_checksum = '';
     foreach ($row as &$column) {
       foreach ($islandora_object as $ds) {
         if ($column['class'] == 'datastream-label' && $column['data'] == $ds->label) {
           $rt_value = "";
           if ($ds->controlGroup == 'M') {
             try {
-              $variable = $ds->location;
               $headers = islandora_vault_get_duracloud_item_properties($ds->location);
-              $rt_value = ($dc_checksum == $headers['Content-Md5']) ? 'Match' : 'Mismatch';
+              $rt_value = ($ds->checksum == $headers['Content-Md5']) ? 'Match' : 'Mismatch';
             } catch (Exception $e) {
               $rt_value = 'Missing';
             }
