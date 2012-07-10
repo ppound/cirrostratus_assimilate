@@ -151,7 +151,7 @@ function islandora_vault_create_set($name, $data, $type = 'query') {
  * @return string 
  *   content of the log
  */
-function islandora_vault_service_log_content($log) {
+function islandora_vault_cloudsync_log_content($log) {
   $iv = IslandoraVault::getInstance();
   try {
     $content = $iv->getTaskLog($log);

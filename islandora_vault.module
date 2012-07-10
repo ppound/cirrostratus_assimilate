@@ -21,8 +21,8 @@ function islandora_vault_menu() {
   $items['islandora_vault/%/manage/vault/logcontent'] = array(
     'title' => 'Islandora Vault Serivce Log Content',
     //'description' => 'Configure settings for Islandora Duracloud cloudsync.',
-    'page callback' => 'islandora_vault_service_log_content',
-    'file' => 'includes/islandora_vault.service.inc',
+    'page callback' => 'islandora_vault_cloudsync_log_content',
+    'file' => 'includes/islandora_vault.cloudsync.service.inc',
     'page arguments' => array('islandora_vault_admin'),
     'access arguments' => array('islandora_vault_access'),
     'page arguments' => array(1),
@@ -88,7 +88,6 @@ function islandora_vault_preprocess_islandora_default_edit(&$variables) {
   $table = &$variables['datastream_table'];
 
   $rows = &$table['rows'];
-  $i = -1;
   foreach ($rows as &$row) {
     foreach ($row as &$column) {
       foreach ($islandora_object as $ds) {

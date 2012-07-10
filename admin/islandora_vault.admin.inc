@@ -25,7 +25,7 @@ function islandora_vault_admin($form, &$form_state) {
     '#type' => 'textfield',
     '#title' => t('CloudSync Url'),
     '#default_value' => variable_get('islandora_vault_cloudsync_url', 'https://ipaddres/cloudsync/api/rest/'),
-    '#description' => t('The URL to use when connecting to Duracloud spaces'),
+    '#description' => t('The URL to use when connecting to cloudsync'),
     '#required' => TRUE,
   );
   
@@ -40,18 +40,50 @@ function islandora_vault_admin($form, &$form_state) {
   $form['islandora_vault_cloudsync_password'] = array(
     '#type' => 'password_confirm',
     '#title' => t('Cloudsync password'),
-    //'#default_value' => variable_get('islandora_vault_cloudsync_password', 'password'),
-    '#required' => TRUE,
+    '#required' => FALSE,
   );
   
   $form ['islandora_vault_duracloud_store'] = array(
     '#type' => 'textfield',
     '#maxlength' => '255',
     '#size' => '80',
+    '#required' => TRUE,
     '#title' => t('Duracloud store url'),
-    '#description' => t('The url for the duracloud store.  This url will be provided by your cloudsync administrator.'),
+    '#description' => t('The url for the Duracloud store.  This url will be provided by your Cloudsync administrator.'),
     '#default_value' => variable_get('islandora_vault_duracloud_store','http://localhost:8080/cloudsync/api/rest/objectStores/id'),    
   );
- //TODO: don't use system settings form so we can encrypt passwords (we need more control over loading and saving the passwords
-  return system_settings_form($form);
+  
+  $form ['islandora_vault_fedora_store'] = array(
+    '#type' => 'textfield',
+    '#maxlength' => '255',
+    '#size' => '80',
+    '#required' => TRUE,
+    '#title' => t('Fedora store url'),
+    '#description' => t('The url for the Fedora store.  This url will be provided by your Cloudsync administrator.'),
+    '#default_value' => variable_get('islandora_vault_fedora_store','http://localhost:8080/cloudsync/api/rest/objectStores/id'),    
+  );
+  
+  $form ['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+ // don't use system settings form so we can encrypt passwords (we need more control over loading and saving the passwords
+  return $form;
+}
+
+function islandora_vault_admin_validate($form, &$form_state){
+  
+}
+function islandora_vault_admin_submit($form, &$form_state) {
+  variable_set('islandora_vault_duracloud_space', $form_state['values']['islandora_vault_duracloud_space']); 
+  variable_set('islandora_vault_cloudsync_url', $form_state['values']['islandora_vault_cloudsync_url']); 
+  variable_set('islandora_vault_cloudsync_user', $form_state['values']['islandora_vault_cloudsync_user']); 
+  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
+  $password = $form_state['values']['islandora_vault_cloudsync_password'];
+  if(!empty($password)){
+    $encrypted_password = islandora_vault_encrypt_password($password);
+    variable_set('islandora_vault_cloudsync_password', $encrypted_password); 
+  }
+  variable_set('islandora_vault_duracloud_store', $form_state['values']['islandora_vault_duracloud_store']); 
+  variable_set('islandora_vault_fedora_store', $form_state['values']['islandora_vault_fedora_store']);
 }

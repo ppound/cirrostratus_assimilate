@@ -48,8 +48,11 @@ class IslandoraVault {
   private static $_instance;
 
   private function __construct() {
+    module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
+    $password = variable_get('islandora_vault_cloudsync_password');
+    $password = islandora_vault_decrypt_password(variable_get('islandora_vault_cloudsync_password', 'password'));
     $this->connection = new VaultConnection(variable_get('islandora_vault_cloudsync_url'), variable_get('islandora_vault_cloudsync_user'),
-            variable_get('islandora_vault_cloudsync_password'));
+            $password);
   }
 
   static public function getInstance() {
@@ -196,6 +199,7 @@ class DuracloudVault {
     $duracloud = json_decode($duracloud, TRUE);
     $data = json_decode($duracloud['objectStore']['data'], TRUE);
     $this->connection = new VaultConnection($data['url'] . '/' . $data['space'], $data['username'], $data['password']);
+    $this->connection->sslVersion = 3;
   }
 
   static public function getInstance() {
@@ -222,8 +226,76 @@ class DuracloudVault {
    * @return type 
    */
   function getItemContent($id) {
-    $id .= '/?attachment=TRUE';
+    $id = '/' . $id;
     $value = $this->connection->getRequest($id);
+    return $value['content'];
+  }
+
+}
+
+class DuracloudService {
+
+  protected $connection = NULL;
+  private static $_instance;
+  private $dc_space;
+
+  private function __construct() {
+    $duracloud_uri = variable_get('islandora_vault_duracloud_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id');
+    $duracloud_id = islandora_vault_identifier_from_uri($duracloud_uri);
+    $iv = IslandoraVault::getInstance();
+    $duracloud = $iv->getObjectStore($duracloud_id);
+    $duracloud = json_decode($duracloud, TRUE);
+    $data = json_decode($duracloud['objectStore']['data'], TRUE);
+    $this->dc_space = $data['space'];
+    $url = stristr($data['url'], 'durastore', TRUE);
+    $this->connection = new VaultConnection($url . '/' . 'duraservice', $data['username'], $data['password']);
+    //https://dgi.duracloud.org will not work unless we set the ssl version
+    $this->connection->sslVersion = 3;
+  }
+
+  static public function getInstance() {
+    if (self::$_instance == NULL) {
+      self::$_instance = new DuracloudService();
+    }
+    return self::$_instance;
+  }
+
+  public function getSpace() {
+    return $this->dc_space;
+  }
+
+  /**
+   * gets a list of services
+   * @param string $id
+   * @return string
+   *    xml describing the services
+   */
+  function getServices($mode = "deployed") {
+    $value = $this->connection->getRequest('/services?show=' . $mode);
+    return $value['content'];
+  }
+
+  /**
+   * get a service
+   * @param string $id
+   * @return string
+   *   xml describing the service
+   */
+  function getService($id) {
+    $id = '/' . $id;
+    $value = $this->connection->getRequest($id);
+    return $value['content'];
+  }
+
+  /**
+   *
+   * @param string $id
+   * @param string $service_config
+   * @return type 
+   */
+  function deployService($id, $service_config) {
+    $id = '/' . $id;
+    $value = $this->connection->putRequest($id, 'string', $service_config);
     return $value['content'];
   }
 

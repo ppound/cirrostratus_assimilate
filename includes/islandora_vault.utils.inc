@@ -11,6 +11,41 @@ function islandora_vault_identifier_from_uri($uri) {
   return substr($start, 1);
 }
 
+function islandora_vault_encrypt_password($input) {
+  try{
+    $key = islandora_vault_get_key();
+  } catch(Exception $e){
+    throw $e;
+  }
+  $encrypted_password = mcrypt_ecb(MCRYPT_3DES, $key, $input, MCRYPT_ENCRYPT);
+  return $encrypted_password;
+}
+
+function islandora_vault_decrypt_password($input) {
+  try{
+    $key = islandora_vault_get_key();
+  } catch(Exception $e){
+    throw $e;
+  }
+  $password = mcrypt_ecb(MCRYPT_3DES, $key, $input, MCRYPT_DECRYPT);
+  return $password;
+}
+
+function islandora_vault_get_key() {
+  $path = @file_get_contents(drupal_get_path('module', 'islandora_vault') . '/includes/key.txt');
+  if (empty($path)) {
+    throw Exception('Could not parse key file');
+  }
+  $key = @file_get_contents($path);
+  if (empty($key)) {
+    $key = $path;
+  }
+  if (strlen($key) > 24) {
+    $key = substr($key, 0, 24);
+  }
+  return $key;
+}
+
 /**
  *
  * @param string $query
@@ -38,22 +73,22 @@ function islandora_vault_get_duracloud_item_properties($duracloud_item) {
  * @param string $header
  * @return array 
  */
-function islandora_vault_http_parse_headers( $header )
-    {
-        $retVal = array();
-        $fields = explode("\r\n", preg_replace('/\x0D\x0A[\x09\x20]+/', ' ', $header));
-        foreach( $fields as $field ) {
-            if( preg_match('/([^:]+): (.+)/m', $field, $match) ) {
-                $match[1] = preg_replace('/(?<=^|[\x09\x20\x2D])./e', 'strtoupper("\0")', strtolower(trim($match[1])));
-                if( isset($retVal[$match[1]]) ) {
-                    $retVal[$match[1]] = array($retVal[$match[1]], $match[2]);
-                } else {
-                    $retVal[$match[1]] = trim($match[2]);
-                }
-            }
-        }
-        return $retVal;
+function islandora_vault_http_parse_headers($header) {
+  $retVal = array();
+  $fields = explode("\r\n", preg_replace('/\x0D\x0A[\x09\x20]+/', ' ', $header));
+  foreach ($fields as $field) {
+    if (preg_match('/([^:]+): (.+)/m', $field, $match)) {
+      $match[1] = preg_replace('/(?<=^|[\x09\x20\x2D])./e', 'strtoupper("\0")', strtolower(trim($match[1])));
+      if (isset($retVal[$match[1]])) {
+        $retVal[$match[1]] = array($retVal[$match[1]], $match[2]);
+      }
+      else {
+        $retVal[$match[1]] = trim($match[2]);
+      }
     }
+  }
+  return $retVal;
+}
 
 /**
  * 

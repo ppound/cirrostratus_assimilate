@@ -16,7 +16,7 @@
 function islandora_vault_manage_object($object) {
   module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
   module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.api');
-  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.service');
+  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.cloudsync.service');
   try {
     $duracloud_stores = islandora_vault_get_datastores_as_option_array();
     $fedora_stores = islandora_vault_get_datastores_as_option_array('fedora');
@@ -139,7 +139,6 @@ function islandora_vault_cs_report_form($form, &$form_state, $object, $task_outp
   return $form;
 }
 
-
 /**
  *
  * @param type $form
@@ -150,14 +149,18 @@ function islandora_vault_cs_report_form($form, &$form_state, $object, $task_outp
  * @return string 
  */
 function islandora_vault_dc_report_form($form, &$form_state, $object, $task_output, $tasks) {
-  $dc = DuracloudVault::getInstance();
-  try{
-    $output = $dc->getItemProperties($object->id);
-  }catch(Exception $e){
-    $output = 'Item does not exist in duracloud';
+  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.duracloud.service');
+  $output = t('Please create a task');
+  if (isset($object['CLOUDSYNC'])) {
+    $dc = DuracloudVault::getInstance();
+    try {
+      $output = $dc->getItemProperties($object->id);
+    } catch (Exception $e) {
+      //drupal_set_message(t('Error getting Duracloud properties %s', array('%s' => $e->getMessage())), 'error');
+      $output = 'Item does not exist in duracloud';
+    }
   }
-  //get list of datastreams
-  //$object->
+  
   $form['run']['titlebox'] = array(
     '#type' => 'item',
     '#title' => t("Duracloud info for @collection_pid", array('@collection_pid' => $object->id)),
@@ -427,12 +430,24 @@ EOD;
     '#disabled' => TRUE,
     '#value' => $durastore['objectStore']['uri'],
   );
-
+  $fedora_uri = variable_get('islandora_vault_fedora_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id');
+  $fedora_id = islandora_vault_identifier_from_uri($fedora_uri);
+  $iv = IslandoraVault::getInstance();
+  try {
+    $fedora_store = $iv->getObjectStore($fedora_id);
+  } catch (Exception $e) {
+    drupal_set_message(t('Could not load Fedora store information'));
+    return "";
+  }
+  $fedora_store = json_decode($fedora_store, TRUE);
   $form['migrate']['fromDatastore'] = array(
-    '#title' => t('Choose a Fedora datastore'),
-    '#description' => t("All chosen content will be replicated to the selected datastore"),
-    '#type' => 'select',
-    '#options' => $fedora_stores,
+    '#title' => t('Fedora datastore'),
+    '#description' => t("All chosen content will be replicated to the selected datastore %s", array ('%s' => $fedora_store['objectStore']['name'])),
+    '#type' => 'textfield',
+    '#size' => 85,
+    '#maxlength' => 255,
+    '#disabled' => TRUE,
+    '#value' => $fedora_store['objectStore']['uri'],
   );
 
   //$form['migrate']['table'] = $table;
