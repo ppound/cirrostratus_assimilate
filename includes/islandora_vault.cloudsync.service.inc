@@ -17,12 +17,13 @@ function islandora_vault_start_task($task) {
 /**
  *
  * @param string $set_id
- * @param string/array $data
+ * @param array $data
  * @return string
  */
-function islandora_vault_update_set($set_id, $data){
+function islandora_vault_update_set($set_id, $updated_set){
   $iv = IslandoraVault::getInstance();
-  return $iv->updateObjectSet($set_id, $data);
+  $updated_set = json_encode($updated_set);
+  return $iv->updateObjectSet($set_id, $updated_set);
 }
 
 /**

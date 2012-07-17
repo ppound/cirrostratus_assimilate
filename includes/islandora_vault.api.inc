@@ -69,9 +69,9 @@ class IslandoraVault {
 
 //sets
   function updateObjectSet($set, $data) {
-    return 'not implemented in cloudsync yet';
+    //return 'not implemented in cloudsync yet';
     $set = '/' . $set;
-    $value = $this->connection->postRequest('objectSets' . $set, 'string', $data, OBJECTSET_JSON);
+    $value = $this->connection->patchRequest('objectSets' . $set, 'string', $data, OBJECTSET_JSON);
     return $value['content'];
   }
 

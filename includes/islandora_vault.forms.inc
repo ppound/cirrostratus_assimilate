@@ -348,30 +348,31 @@ function islandora_vault_run_cloudsync_task_form_submit($form, &$form_state) {
     form_set_error(NULL, t('Error loading task for %s', array('%s' => $object->id)));
     return $form;
   }
-  $decode = json_decode($json->content, TRUE);
+  $cloudsync = json_decode($json->content, TRUE);
   $task_type = 'Backup';
   //update the restore tasks set pidlist
   try {
-    $set_data = islandora_vault_get_set_by_task($decode['backup']['task'], TRUE);
+    $set_data = islandora_vault_get_set_by_task($cloudsync['backup']['task'], TRUE);
     $pid_list = islandora_vault_get_pid_list($object, $set_data['queryText'], $set_data['queryType']);
-    $set = islandora_vault_get_set_by_task($decode['restore']['task']);
+    $set = islandora_vault_get_set_by_task($cloudsync['restore']['task']);
     $set_id = islandora_vault_identifier_from_uri($set['objectSet']['uri']);
-    islandora_vault_update_set($set_id, $pid_list);
+    $set['objectSet']['data'] = $pid_list;
+    islandora_vault_update_set($set_id, $set);
   } catch (Exception $e) {
     drupal_set_message(t('Error updating task pidList for %p %s', array('%s' => $e->getMessage(), '%p' => $object->id)), 'error');
     return "";
   }
   if ($form_state['values']['op'] == 'Copy from Duracloud to Fedora') {
-    $task_id = islandora_vault_identifier_from_uri($decode['restore']['task']['uri']);
+    $task_id = islandora_vault_identifier_from_uri($cloudsync['restore']['task']['uri']);
     $task_type = 'Restore';
   }
   else {
-    $task_id = islandora_vault_identifier_from_uri($decode['backup']['task']['uri']);
+    $task_id = islandora_vault_identifier_from_uri($cloudsync['backup']['task']['uri']);
   }
   try {
     islandora_vault_start_task($task_id);
   } catch (Exception $e) {
-    drupal_set_message(t('Error running %t task. %s', array('%s' => $e->getMessage(), '%t' => $task_type)));
+    drupal_set_message(t('Error running %t task. %s', array('%s' => $e->getMessage(), '%t' => $task_type)),'error');
   }
   drupal_set_message(t('%s Task started.  Please check back later.  When the task is complete
     the state will be reported as idle and you will be able to view the log in the Cloudsync Reports section.  
@@ -417,7 +418,8 @@ EOD;
   try {
     $durastore = $iv->getObjectStore($durastore_id);
   } catch (Exception $e) {
-    drupal_set_message(t('Could not load durastore information'));
+    drupal_set_message(t('Could not load durastore information.  You may need to configure your Islandora_vault instance or the cloudsync service may not 
+      be responding'),'error');
     return "";
   }
   $durastore = json_decode($durastore, TRUE);
@@ -524,6 +526,8 @@ function islandora_vault_create_cloudsync_task_form_submit($form, &$form_state) 
   $data['destStoreUri'] = $form_state['values']['toDatastore'];
   $data['overwrite'] = 'true';
   $data['includeManaged'] = 'true';
+  $data['copyExternal'] = 'false';
+  $data['copyRedirect'] = 'false';
 
   try {
     $backup_json = islandora_vault_create_task($backup_task_label, $data, $type);
