@@ -42,6 +42,9 @@ class VaultConnection extends RepositoryConnection {
 
 }
 
+/**
+ * cloudsync api 
+ */
 class IslandoraVault {
 
   protected $connection = NULL;
@@ -186,18 +189,25 @@ class IslandoraVault {
 
 }
 
+
+/**
+ * duracloud api functions we can call as a normal user 
+ */
 class DuracloudVault {
 
   protected $connection = NULL;
   private static $_instance;
+  protected $dc_space;
 
   private function __construct() {
     $duracloud_uri = variable_get('islandora_vault_duracloud_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id');
+    module_load_include('inc','islandora_vault','includes/islandora_vault.utils');
     $duracloud_id = islandora_vault_identifier_from_uri($duracloud_uri);
     $iv = IslandoraVault::getInstance();
     $duracloud = $iv->getObjectStore($duracloud_id);
     $duracloud = json_decode($duracloud, TRUE);
     $data = json_decode($duracloud['objectStore']['data'], TRUE);
+    $this->dc_space = $data['space'];
     $this->connection = new VaultConnection($data['url'] . '/' . $data['space'], $data['username'], $data['password']);
     $this->connection->sslVersion = 3;
   }
@@ -207,6 +217,10 @@ class DuracloudVault {
       self::$_instance = new DuracloudVault();
     }
     return self::$_instance;
+  }
+  
+   public function getSpace() {
+    return $this->dc_space;
   }
 
   /**
@@ -233,11 +247,14 @@ class DuracloudVault {
 
 }
 
+/**
+ * Duracloud service api requires admin access 
+ */
 class DuracloudService {
 
   protected $connection = NULL;
   private static $_instance;
-  private $dc_space;
+  protected $dc_space;
 
   private function __construct() {
     $duracloud_uri = variable_get('islandora_vault_duracloud_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id');
@@ -300,4 +317,63 @@ class DuracloudService {
   }
 
 }
+
+/**
+ * Duracloud service api 
+ * we use a default space of x-service-out for this classes connection
+ * x-service-out is where all the service reports get written
+ */
+class DuraBoss extends DuraCloudVault{
+
+  protected $report_connection = NULL;
+  private static $_instance;
+
+  private function __construct() {
+    $duracloud_uri = variable_get('islandora_vault_duracloud_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id');
+    module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.utils');
+    $duracloud_id = islandora_vault_identifier_from_uri($duracloud_uri);
+    $iv = IslandoraVault::getInstance();
+    $duracloud = $iv->getObjectStore($duracloud_id);
+    $duracloud = json_decode($duracloud, TRUE);
+    $data = json_decode($duracloud['objectStore']['data'], TRUE);
+    $url = stristr($data['url'], 'durastore', TRUE);
+    $username = variable_get('islandora_vault_dc_admin_user');
+    $password = variable_get('islandora_vault_dc_admin_user_pass');
+    if (empty($username) || empty($password)) {
+      throw new Exception('Error getting Duracloud admin username or password');
+    }
+    $this->dc_space = $data['space'];
+    $password = islandora_vault_decrypt_password($password);
+    $this->report_connection = new VaultConnection($url . '/' . 'duraboss', $username, $password);
+    $this->connection = new VaultConnection($data['url'] .'/'. 'x-service-out', $username, $password);
+    //https://dgi.duracloud.org will not work unless we set the ssl version
+    $this->connection->sslVersion = 3;
+    $this->report_connection->sslVersion = 3;
+  }
+
+  static public function getInstance() {
+    if (self::$_instance == NULL) {
+      self::$_instance = new DuraBoss();
+    }
+    return self::$_instance;
+  }
+
+  function getServiceReportListSummary() {
+    $value = $this->report_connection->getRequest('/report/service/list');
+    return $value['content'];
+  }
+  
+  function getCompletedServicesReport($limit = 20){
+    $value = $this->report_connection->getRequest('/report/service?' . $limit);
+    return $value['content'];
+  }
+
+  function getServiceReport($id) {
+    $id = '/' . $id;
+    $value = $this->report_connection->getRequest('/report/service' . $id);
+    return $value['content'];
+  }
+
+}
+
 

@@ -38,8 +38,24 @@ function islandora_vault_menu() {
     'file' => 'includes/islandora_vault.forms.inc',
     'access arguments' => array(2),
   );
+  $items['islandora_vault/test'] = array(
+    'title' => 'foo',
+    'access callback' => 'user_access',
+    'page callback' => 'islandora_vault_test',
+    'type' => MENU_CALLBACK,
+    'access arguments' => array('administer site configuration'),
+  );
 
   return $items;
+}
+
+function islandora_vault_test() {
+  module_load_include('inc', 'islandora_vault', 'includes/islandora_vault.duracloud.service');
+  module_load_include('inc', 'islandora_vault', 'islandora_vault.api');
+  $duraboss = DuraBoss::getInstance();
+  $report = islandora_vault_get_latest_report_id($duraboss);
+  $report = substr($report, 14 );//don't want the x-service-out part of the path
+  return $duraboss->getItemContent($report);
 }
 
 /**

@@ -3,6 +3,7 @@
 /**
  * tries to deploy a duracloud service
  * @param string $id
+ * NOT USING THS FUNCTION
  * @return string 
  */
 function islandora_vault_deploy_service($id) {
@@ -24,11 +25,45 @@ function islandora_vault_deploy_service($id) {
   </userConfig>
 </ns1:service>
 EOD;
-  try{
+  try {
     $rt = $dcs->deployService('0', $service_config);
-  }catch(Exception $e){
+  } catch (Exception $e) {
     drupal_set_message(t('Error deploying Service %s', array('%s' => $e->getMessage())));
     return "";
   }
   return $rt;
+}
+
+
+/**
+ * gets a report name from the summary reports list
+ * gets report for the space we are managing
+ * @return type 
+ */
+function islandora_vault_get_latest_report_id($duraboss) {
+  $report_list = $duraboss->getCompletedServicesReport();
+  $xml = new DomDocument();
+  $xml->loadXML($report_list);
+  $xpath = new DOMXPath($xml);
+  $space = $duraboss->getSpace();
+  $xpath->registerNamespace('dur', 'duracloud.org');
+  $nodes = $xpath->query("//configs/property[@name='Space containing content items']");
+  $length = $nodes->length;
+  $report_name = NULL;
+  foreach ($nodes as $node) {
+    $tst = $node->nodeValue;
+    if ($tst == $space) {
+      $config = $node->parentNode;
+      $summary = $config->parentNode;
+      $sxml = simplexml_import_dom($summary);
+      foreach ($sxml->properties->property as $p) {
+        if ($p['name'] == 'Report') {
+          $report_name = (string) $p;
+          return $report_name;//assuming first report we find is the right one
+          //this assumption may need to be revisted
+        }
+      }
+    }
+  }
+  return $report_name;
 }

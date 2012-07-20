@@ -11,6 +11,12 @@ function islandora_vault_identifier_from_uri($uri) {
   return substr($start, 1);
 }
 
+/**
+ *
+ * @param string $input
+ * @return string
+ * @throws Exception 
+ */
 function islandora_vault_encrypt_password($input) {
   try{
     $key = islandora_vault_get_key();
@@ -21,6 +27,12 @@ function islandora_vault_encrypt_password($input) {
   return $encrypted_password;
 }
 
+/**
+ *
+ * @param string $input
+ * @return string
+ * @throws Exception 
+ */
 function islandora_vault_decrypt_password($input) {
   try{
     $key = islandora_vault_get_key();
@@ -31,6 +43,12 @@ function islandora_vault_decrypt_password($input) {
   return $password;
 }
 
+/**
+ *
+ * @return string
+ * @throws Exception
+ *   if it can't read the keyfile 
+ */
 function islandora_vault_get_key() {
   $path = @file_get_contents(drupal_get_path('module', 'islandora_vault') . '/includes/key.txt');
   if (empty($path)) {
@@ -61,6 +79,13 @@ function islandora_vault_get_pid_list(&$object, $query, $type = 'itql') {
   return $pid_list;
 }
 
+
+/**
+ *
+ * @param string $duracloud_item
+ *   name of a file in duracloud
+ * @return type 
+ */
 function islandora_vault_get_duracloud_item_properties($duracloud_item) {
   $dc = DuracloudVault::getInstance();
   $output = $dc->getItemProperties($duracloud_item);
