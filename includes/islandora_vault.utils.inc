@@ -20,10 +20,22 @@ function islandora_vault_identifier_from_uri($uri) {
 function islandora_vault_encrypt_password($input) {
   try{
     $key = islandora_vault_get_key();
-  } catch(Exception $e){
+  } catch (Exception $e){
     throw $e;
   }
-  $encrypted_password = mcrypt_ecb(MCRYPT_3DES, $key, $input, MCRYPT_ENCRYPT);
+  $td = mcrypt_module_open('tripledes', '', 'ecb', '');
+  $iv = variable_get('islandora_vault_iv');
+  if (empty($iv)) {
+    $iv = mcrypt_create_iv(mcrypt_enc_get_iv_size($td), MCRYPT_RAND);
+    variable_set('islandora_vault_iv', $iv);
+  }
+
+  mcrypt_generic_init($td, $key, $iv);
+  $encrypted_password = mcrypt_generic($td, $input);
+  mcrypt_generic_deinit($td);
+  mcrypt_module_close($td);
+
+  //$encrypted_password = mcrypt_ecb(MCRYPT_3DES, $key, $input, MCRYPT_ENCRYPT);
   return $encrypted_password;
 }
 
@@ -36,10 +48,16 @@ function islandora_vault_encrypt_password($input) {
 function islandora_vault_decrypt_password($input) {
   try{
     $key = islandora_vault_get_key();
-  } catch(Exception $e){
+  } catch (Exception $e){
     throw $e;
   }
-  $password = mcrypt_ecb(MCRYPT_3DES, $key, $input, MCRYPT_DECRYPT);
+  $iv = variable_get('islandora_vault_iv');
+  $td = mcrypt_module_open('tripledes', '', 'ecb', '');
+  mcrypt_generic_init($td, $key, $iv);
+  $password = mdecrypt_generic($td, $input);
+  mcrypt_generic_deinit($td);
+  mcrypt_module_close($td);
+  //$password = mcrypt_ecb(MCRYPT_3DES, $key, $input, MCRYPT_DECRYPT);
   return $password;
 }
 
@@ -78,7 +96,6 @@ function islandora_vault_get_pid_list(&$object, $query, $type = 'itql') {
   }
   return $pid_list;
 }
-
 
 /**
  *
