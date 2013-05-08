@@ -1,0 +1,39 @@
+/* 
+    Document   : islandora_vault
+    Created on : May 8, 2013, 11:09:36 AM
+    Author     : ppound
+    Description:
+        Purpose of the stylesheet follows.
+*/
+@font-face
+{
+font-family: heyding;
+src: url('fonts/heydings_icons.ttf');
+}
+.islandora-vault-match:before {
+   font-family: heyding;
+   font-size: larger;
+   color: green;
+   content: "O ";
+} 
+
+.islandora-vault-mismatch:before {
+    font-family: heyding;
+    font-size: larger;
+    color: red;
+     content: "X ";
+} 
+
+.islandora-vault-unknown:before {
+    font-family: heyding;
+    font-size: larger;
+    color: orange;
+content: "Q ";
+} 
+
+.islandora-vault-missing:before {
+    font-family: heyding;
+    font-size: larger;
+    color: red;
+content: "X ";
+} 

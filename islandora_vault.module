@@ -1,6 +1,7 @@
 <?php
 
 define('ISLANDORA_VAULT_MANAGE_ITEMS', 'manage islandora vault items');
+define('ISLANDORA_VAULT_MANAGE', 'manage islandora vault admin');
 
 /**
  * Implementation of hook_menu. 
@@ -54,12 +55,12 @@ function islandora_vault_test() {
   module_load_include('inc', 'islandora_vault', 'islandora_vault.api');
   $duraboss = DuraBoss::getInstance();
   $report = islandora_vault_get_latest_report_id($duraboss);
-  $report = substr($report, 14 );//don't want the x-service-out part of the path
+  $report = substr($report, 14); //don't want the x-service-out part of the path
   return $duraboss->getItemContent($report);
 }
 
 /**
- * determines whether or not to show this modules manage tab
+ * determines whether or not to show this modules vault tab
  * @global object $user
  * @param string $object_id
  * @return boolean
@@ -68,7 +69,7 @@ function islandora_vault_access($fedora_object) {
   if (!isset($fedora_object)) {
     return FALSE;
   }
-  return user_access(FEDORA_MANAGE);
+  return user_access(ISLANDORA_VAULT_MANAGE);
 }
 
 /* function islandora_vault_admin_paths(){
@@ -112,9 +113,16 @@ function islandora_vault_preprocess_islandora_default_edit(&$variables) {
           if ($ds->controlGroup == 'M') {
             try {
               $headers = islandora_vault_get_duracloud_item_properties($ds->location);
-              $rt_value = ($ds->checksum == $headers['Content-Md5']) ? 'Match' : 'Mismatch';
+              $chksum = $ds->checksum;
+              if ($chksum == 'none') {
+                $rt_value = '<div class="islandora-vault-unknown" label="File exists in both Fedora and Duracloud but does not have a checksum in Fedora">Missing Checksum </div>';
+              }
+              else {
+                $rt_value = ($ds->checksum == $headers['Content-Md5']) ? '<div class="islandora-vault-match" label="checksums in Fedora and Duracloud are the same">Match</div>'
+                : '<div class="islandora-vault-mismatch" label="checksums in Fedora and Duracloud are not the same">Mismatch</div>';
+              }
             } catch (Exception $e) {
-              $rt_value = 'Missing';
+              $rt_value = '<div class="islandora-vault-missing" label="File does not exist in Duracloud">Missing File</div>';
             }
           }
         }

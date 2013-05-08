@@ -41,7 +41,8 @@ function islandora_vault_admin($form, &$form_state) {
     '#size' => '80',
     '#required' => TRUE,
     '#title' => t('Duracloud store url'),
-    '#description' => t('The url for the Duracloud store.  This url will be provided by your Cloudsync administrator.'),
+    '#description' => t('The url for the Duracloud store.  This is the url to the store within Cloudsync,
+      not the direct url to Duracloud.  This url will be provided by your Cloudsync administrator.'),
     '#default_value' => variable_get('islandora_vault_duracloud_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id'),
   );
 
@@ -51,7 +52,8 @@ function islandora_vault_admin($form, &$form_state) {
     '#size' => '80',
     '#required' => TRUE,
     '#title' => t('Fedora store url'),
-    '#description' => t('The url for the Fedora store.  This url will be provided by your Cloudsync administrator.'),
+    '#description' => t('The url for the Fedora store.  This is the url to the Fedora store within Cloudsync,
+      not the direct url to Fedora. This url will be provided by your Cloudsync administrator.'),
     '#default_value' => variable_get('islandora_vault_fedora_store', 'http://localhost:8080/cloudsync/api/rest/objectStores/id'),
   );
 
